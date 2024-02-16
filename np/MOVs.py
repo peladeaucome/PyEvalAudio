@@ -290,7 +290,7 @@ class Mixin:
         return NLrmsB
 
     def detectionProbability(self, EsTilde_T, EsTilde_R):
-        numChannels, numBins, numFrames = EsTilde_T.size
+        numChannels, numBins, numFrames = EsTilde_T.shape
 
         EsTilde_T_dB = self.dB10(EsTilde_T)
         EsTilde_R_dB = self.dB10(EsTilde_R)
