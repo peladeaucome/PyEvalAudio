@@ -8,12 +8,9 @@ import time_to_freq
 import MOVs
 import ODG
 
+
 class PEAQ(
-    utils.Mixin,
-    time_to_freq.Mixin,
-    pattern_processing.Mixin,
-    MOVs.Mixin,
-    ODG.Mixin
+    utils.Mixin, time_to_freq.Mixin, pattern_processing.Mixin, MOVs.Mixin, ODG.Mixin
 ):
     """The advanced-mode is not used for now."""
 
@@ -86,6 +83,58 @@ class PEAQ(
         # Returning all the values needed to compute the MOVs
         return EP_T, EP_R, M_T, M_R, Ebar_R, Ntot_T, Ntot_R
 
+    def compute_allMOVs(
+        self,
+        X_T,
+        X_R,
+        Es_T,
+        Es_R,
+        EsTilde_T,
+        EsTilde_R,
+        EbN,
+        EP_T,
+        EP_R,
+        M_T,
+        M_R,
+        Ebar_R,
+        Ntot_T,
+        Ntot_R,
+    ):
+
+        MWdiff1B, MAdiff1B, MAdiff2B = self.compute_modulationChanges(
+            M_T=M_T, M_R=M_R, Ebar_R=Ebar_R
+        )
+
+        W_R, W_T = self.compute_bandwidth(X_T=X_T, X_R=X_R)
+
+        NLrmsB = self.compute_RMSNoiseLoud(
+            EP_T=EP_T, EP_R=EP_R, M_R=M_R, M_T=M_T, Ntot_T=Ntot_T, Ntot_R=Ntot_R
+        )
+
+        RNMtot, RNmax = self.masking(EsTilde_T=EsTilde_T, EsTilde_R=EsTilde_R, EbN=EbN)
+
+        MFPD_B, ADB_B = self.detectionProbability(
+            EsTilde_T=EsTilde_T, EsTilde_R=EsTilde_R
+        )
+
+        EHB = self.errorHarmonicStructure(X_T=X_T, X_R=X_R)
+
+        MOVs_vect = np.array(
+            [
+                W_R,
+                W_T,
+                RNMtot,
+                MWdiff1B,
+                ADB_B,
+                EHB,
+                MAdiff1B,
+                MAdiff2B,
+                NLrmsB,
+                MFPD_B,
+                RNmax,
+            ]
+        )
+
     def two_f_model(self, x_T, x_R):
         X_T, X_R, Es_T, Es_R, EsTilde_T, EsTilde_R, EbN = self.timeToFrequencyDomain(
             x_T, x_R
@@ -102,11 +151,63 @@ class PEAQ(
 
         patt = self.patternProcessing(Es_T, Es_R)
         EP_T, EP_R, M_T, M_R, Ebar_R, Ntot_T, Ntot_R = patt
-
+        print(X_T.shape)
         startFrame_idx, endFrame_idx = self.get_dataBoundary(x_T=x_T, x_R=x_R)
+        print(startFrame_idx, endFrame_idx)
 
-        Ntot_T, Ntot_R = crop_multiple(
-            Ntot_T, Ntot_R, start_idx=startFrame_idx, end_idx=endFrame_idx
+        # Ntot_T, Ntot_R = crop_multiple(
+        #    Ntot_T, Ntot_R, start_idx=startFrame_idx, end_idx=endFrame_idx
+        # )
+
+        (
+            X_T,
+            X_R,
+            Es_T,
+            Es_R,
+            EsTilde_T,
+            EsTilde_R,
+            EbN,
+            EP_T,
+            EP_R,
+            M_T,
+            M_R,
+            Ebar_R,
+            Ntot_T,
+            Ntot_R,
+        ) = crop_multiple(
+            X_T,
+            X_R,
+            Es_T,
+            Es_R,
+            EsTilde_T,
+            EsTilde_R,
+            EbN,
+            EP_T,
+            EP_R,
+            M_T,
+            M_R,
+            Ebar_R,
+            Ntot_T,
+            Ntot_R,
+            start_idx=startFrame_idx,
+            end_idx=endFrame_idx,
+        )
+
+        self.compute_allMOVs(
+            X_T,
+            X_R,
+            Es_T,
+            Es_R,
+            EsTilde_T,
+            EsTilde_R,
+            EbN,
+            EP_T,
+            EP_R,
+            M_T,
+            M_R,
+            Ebar_R,
+            Ntot_T,
+            Ntot_R,
         )
 
         return patt
@@ -269,6 +370,8 @@ if __name__ == "__main__":
     print(
         f"Loudness difference:                               {round(np.mean(Ntot_R)-np.mean(Ntot_T), 3)} sones"
     )
+
+    peaq.compute_PEAQ(x_T, x_R)
     # print(Ntot_R)
     # print(out)
 

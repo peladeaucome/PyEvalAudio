@@ -22,15 +22,44 @@ class Mixin:
             ]
         )
         wxb = np.array([-2.518254, 0.654841, -2.207228])
-        self.lin1 = Linear(
-            w=wx, b=wxb
-        )
+        self.lin1 = Linear(w=wx, b=wxb)
 
         wy = np.array([[-3.817048], [4.107138], [4.629582]])
         wyb = np.array([-0.307594])
         self.lin2 = Linear(w=wy, b=wyb)
 
-    @staticmethod
+        self.MOVs_min = np.array(
+            [
+                393.916656,
+                361.965332,
+                -24.045116,
+                1.110661,
+                -0.206623,
+                0.074318,
+                1.113683,
+                0.950345,
+                0.029985,
+                0.000101,
+                0,
+            ]
+        )
+
+        self.MOVs_max = np.array(
+            [
+                921,
+                881.131226,
+                16.212030,
+                107.137772,
+                2.886017,
+                13.933351,
+                63.257874,
+                1145.018555,
+                14.819740,
+                1.0,
+                1.0,
+            ]
+        )
+
     def scale_var(x, amin, amax):
         return (x - amin) / (amax - amin)
 
@@ -38,9 +67,7 @@ class Mixin:
     def sigmoid(x: npt.ArrayLike):
         return 1 / (1 + np.exp(-x))
 
-    
-
-    def neuralNet(self, MOVs_vect):
+    def neuralNet(self, MOVs_vect_norm):
         """Compute the ODG from the MOVs vect
 
         Inputs:
@@ -49,24 +76,31 @@ class Mixin:
         ``MOVs_vect`` : array-like (shape [1,11])
         """
 
-        out = self.sigmoid(self.lin1(MOVs_vect))
-        out = self.lin2(out)
+        out = self.sigmoid(self.lin1(MOVs_vect_norm))
+        out = self.lin2(out)[0]
         return out
 
+    def ODG(self, MOVs_vect):
 
+        MOVs_vect_norm = self.scale_var(MOVs_vect, self.MOVs_min, self.MOVs_max)
+
+        ODG = self.neuralNet(MOVs_vect_norm)
+
+        return ODG
 
 
 class Linear:
     """
     Linear layer of a neural network.
     """
+
     def __init__(
         self,
-        w:npt.ArrayLike=None,
-        b:npt.ArrayLike=None,
+        w: npt.ArrayLike = None,
+        b: npt.ArrayLike = None,
     ):
-        self.w=w
-        self.b=b
+        self.w = w
+        self.b = b
         self.n_in, self.n_out = w.shape
 
     @staticmethod
@@ -81,9 +115,9 @@ class Linear:
         ``b`` : array-like of shape n_out
         """
 
-        out = np.sum(x.reshape(x.shape[0], 1)*w, axis=0)
-        return out+b
-    
+        out = np.sum(x.reshape(x.shape[0], 1) * w, axis=0)
+        return out + b
+
     def __call__(self, x):
         return self.func_linear(x, w=self.w, b=self.b)
 
