@@ -13,7 +13,6 @@ class Mixin:
             -1 / (self.Fss_fft * timeConstants)
         )
 
-
     def excitationPatternProcessing(
         self,
         EsTilde_T: npt.ArrayLike,
@@ -86,41 +85,36 @@ class Mixin:
         Es_R: npt.ArrayLike,
     ) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
 
-        Es_T_prev = np.zeros_like(Es_T)
-        Es_T_prev[:, :, 1] = Es_T[:, :, -2]
-
-        Es_R_prev = np.zeros_like(Es_R)
-        Es_R_prev[:, :, 1] = Es_R[:, :, -2]
-
         # \bar{E}_R, \bar{E}_T
         Ebar_R: npt.ArrayLike = self.AR_filter(
-            X=Es_R, alpha=np.power(self.timeToFreqAlpha, 0.3)
+            X=np.power(Es_R, 0.3), alpha=self.timeToFreqAlpha
         )
         Ebar_T: npt.ArrayLike = self.AR_filter(
-            X=Es_T, alpha=np.power(self.timeToFreqAlpha, 0.3)
+            X=np.power(Es_T, 0.3), alpha=self.timeToFreqAlpha
         )
+
+        Es_T_prev = np.zeros_like(Es_T)
+        Es_T_prev[:, :, 1:] = Es_T[:, :, :-1]
+
+        Es_R_prev = np.zeros_like(Es_R)
+        Es_R_prev[:, :, 1:] = Es_R[:, :, :-1]
 
         # \bar{D}_R, \bar{D}_T
         self.Fss_fft = self.sr_hz / 1024
-        Dbar_R = (
-            self.AR_filter(
-                X=np.abs(np.power(Es_R, 0.3) - np.power(Es_R_prev, 0.3)),
-                alpha=self.timeToFreqAlpha,
-            )
-            * self.Fss_fft
+        Dbar_R = self.AR_filter(
+            X=np.abs(np.power(Es_R, 0.3) - np.power(Es_R_prev, 0.3)) * self.Fss_fft,
+            alpha=self.timeToFreqAlpha,
         )
-        Dbar_T = (
-            self.AR_filter(
-                X=np.abs(np.power(Es_T, 0.3) - np.power(Es_T_prev, 0.3)),
-                alpha=self.timeToFreqAlpha,
-            )
-            * self.Fss_fft
+        Dbar_T = self.AR_filter(
+            X=np.abs(np.power(Es_T, 0.3) - np.power(Es_T_prev, 0.3)) * self.Fss_fft,
+            alpha=self.timeToFreqAlpha,
         )
 
         # M_T, M_R
         M_T: npt.ArrayLike = Dbar_T / (1 + Ebar_T / 0.3)
         M_R: npt.ArrayLike = Dbar_R / (1 + Ebar_R / 0.3)
 
+    
         return M_T, M_R, Ebar_R
 
     def loudnessCalculation(

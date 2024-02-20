@@ -111,13 +111,15 @@ class PEAQ(
             EP_T=EP_T, EP_R=EP_R, M_R=M_R, M_T=M_T, Ntot_T=Ntot_T, Ntot_R=Ntot_R
         )
 
-        RNMtot, RNmax = self.masking(EsTilde_T=EsTilde_T, EsTilde_R=EsTilde_R, EbN=EbN)
+        RNMtot, RelDistFrames = self.masking(
+            EsTilde_T=EsTilde_T, EsTilde_R=EsTilde_R, EbN=EbN
+        )
 
         MFPD_B, ADB_B = self.detectionProbability(
             EsTilde_T=EsTilde_T, EsTilde_R=EsTilde_R
         )
 
-        EHB = self.errorHarmonicStructure(X_T=X_T, X_R=X_R)
+        EHB = self.errorHarmonicStructure(X_T=X_T, X_R=X_R, x_T=x_T, x_R=x_R)
 
         MOVs_vect = np.array(
             [
@@ -131,9 +133,11 @@ class PEAQ(
                 MAdiff2B,
                 NLrmsB,
                 MFPD_B,
-                RNmax,
+                RelDistFrames,
             ]
         )
+        print(MOVs_vect)
+        return MOVs_vect
 
     def two_f_model(self, x_T, x_R):
         X_T, X_R, Es_T, Es_R, EsTilde_T, EsTilde_R, EbN = self.timeToFrequencyDomain(
@@ -151,14 +155,19 @@ class PEAQ(
 
         patt = self.patternProcessing(Es_T, Es_R)
         EP_T, EP_R, M_T, M_R, Ebar_R, Ntot_T, Ntot_R = patt
-        print(X_T.shape)
+
+        plt.pcolormesh(M_T[0])
+        plt.show()
+        plt.pcolormesh(M_R[0])
+        plt.show()
+        print(self.Fss_fft)
+        print('ndel', self.Ndel)
         startFrame_idx, endFrame_idx = self.get_dataBoundary(x_T=x_T, x_R=x_R)
-        print(startFrame_idx, endFrame_idx)
 
         # Ntot_T, Ntot_R = crop_multiple(
         #    Ntot_T, Ntot_R, start_idx=startFrame_idx, end_idx=endFrame_idx
         # )
-
+        print("start and end frames", startFrame_idx, endFrame_idx)
         (
             X_T,
             X_R,
@@ -193,7 +202,7 @@ class PEAQ(
             end_idx=endFrame_idx,
         )
 
-        self.compute_allMOVs(
+        MOVs_vect = self.compute_allMOVs(
             X_T,
             X_R,
             Es_T,
@@ -210,7 +219,8 @@ class PEAQ(
             Ntot_R,
         )
 
-        return patt
+        ODG = self.ODG(MOVs_vect=MOVs_vect)
+        return ODG
 
 
 class Data:
@@ -370,8 +380,23 @@ if __name__ == "__main__":
     print(
         f"Loudness difference:                               {round(np.mean(Ntot_R)-np.mean(Ntot_T), 3)} sones"
     )
+    
 
-    peaq.compute_PEAQ(x_T, x_R)
+    f = 10000
+    numSamples = peaq.hopSize * 250
+    n = np.arange(numSamples)
+    n = n.reshape(1, numSamples)
+    amp = Amax * 100 / peaq.idB20(92)
+    print("amp",amp)
+    x_R = np.sin(n * 2 * np.pi * f / peaq.sr_hz) * amp * (np.sin(n*2*np.pi*16/ peaq.sr_hz)+1)/2 + np.random.randn(numSamples)*amp/100 # ref signal
+    x_T = x_R + np.random.randn(numSamples)*amp/20*(np.sin(n*2*np.pi*3/ peaq.sr_hz)+1)/2 # test signal
+
+    x_R = x_R.reshape(1, numSamples)
+    x_T = x_T.reshape(1, numSamples)
+
+    grade = peaq.compute_PEAQ(x_T, x_R)
+
+    print(grade)
     # print(Ntot_R)
     # print(out)
 

@@ -60,6 +60,7 @@ class Mixin:
             ]
         )
 
+    @staticmethod
     def scale_var(x, amin, amax):
         return (x - amin) / (amax - amin)
 
