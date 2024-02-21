@@ -46,7 +46,7 @@ class Mixin:
             start_idx // self.hopSize,
             end_idx // self.hopSize,
         )
-
+        endFrame_idx += 1
         return startFrame_idx, endFrame_idx
 
     def compute_modulationChanges(
@@ -54,7 +54,6 @@ class Mixin:
     ) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
         numChannels, _, N = M_T.shape
 
-        print("M_T shape", M_T.shape)
         # Delayed averaging
         M_T = M_T[:, :, self.Ndel :]
         M_R = M_R[:, :, self.Ndel :]
@@ -79,27 +78,33 @@ class Mixin:
         MWdiff1B = np.mean(MWdiff1B)  # Mean across stereo channels
 
         ## AvgModDiff1B
+        # Temporal weighting, Eq (78)
         W1B = np.sum(
             Ebar_R / (Ebar_R + 100 * np.power(self.E_IN, 0.3)), axis=1, keepdims=True
         )
+
+        # Temporally weighted time average, Eq. (77)
         MAdiff1B = np.sum(Mdiff1bTilde * W1B, axis=1) / np.sum(W1B, axis=1)
+
         # Mean across channels
         MAdiff1B = np.mean(MAdiff1B)
 
         ## AvgModDiff2B
-        idx = np.where(M_T < M_R)
-        Mdiff2B = (M_T - M_R) / (0.01 + M_R)
+        # Instantaneous modulation difference, Eq. (79)
+        Mdiff2B = np.abs((M_T - M_R) / (0.01 + M_R))
+        Mdiff2B = np.where(M_T >= M_R, Mdiff2B, -0.1 * Mdiff2B)
 
-        Mdiff2B[idx] = 0.1 * (M_R[idx] - M_T[idx]) / (0.01 + M_R[idx])
+        # Average over bands, Eq. (80)
+        Mdiff2BTilde = 100 * np.mean(Mdiff2B, axis=1)
 
-        Mdiff2BTilde = 100 / self.numBarkBands * np.sum(Mdiff2B, axis=1)
-
+        # Temporal weighting, Eq.(82) & (78)
         W2B = W1B
 
-        MAdiff2B = np.sum(W2B * Mdiff2BTilde, axis=1) / np.sum(
-            W2B, axis=1
-        )  # Sum accross time
-        MAdiff2B = np.mean(MAdiff2B)  # Mean across channels
+        # Temporally weighted time average, Eq. (81)
+        MAdiff2B = np.sum(W2B * Mdiff2BTilde, axis=1) / np.sum(W2B, axis=1)
+
+        # Mean across channels
+        MAdiff2B = np.mean(MAdiff2B)
 
         return MWdiff1B, MAdiff1B, MAdiff2B
 
@@ -107,24 +112,23 @@ class Mixin:
         self, EP_T, EP_R, M_R, M_T, alpha, T0, S0
     ) -> npt.ArrayLike:
 
-        beta = np.exp(-alpha * (EP_T - EP_R) / EP_R)
+        beta = np.exp(-alpha * (EP_T / EP_R - 1))
 
         E_t = self.E_IN.copy()
         E_t = E_t.reshape(1, self.numBarkBands, 1)
 
+        # Threshold factors, Eq. (88)
         s_R = T0 * M_R + S0
         s_T = T0 * M_T + S0
 
         E0 = 1
 
-        NL = np.power(E_t / (s_T * E0), 0.23)
-        NL = NL * (
-            np.power(
-                1 + np.maximum(s_T * EP_T - s_R * EP_R, 0) / (E_t + beta * s_R * EP_R),
-                0.23,
-            )
-            - 1
-        )
+        # Partial Loudness, Eq. (87)
+        a = np.maximum(s_T * EP_T - s_R * EP_R, 0)
+        b = E_t + beta * s_R * EP_R
+
+        NL = np.power(E_t / s_T, 0.23) * (np.power(1 + a / b, 0.23) - 1)
+        NL = NL
 
         return NL
 
@@ -137,15 +141,57 @@ class Mixin:
         loudnessTest_idx = self.loudnessTest(Ntot_T, Ntot_R)
         NL = NL[:, :, loudnessTest_idx:]
 
-        # Computing the MOV
-        NiLTilde = 24 / self.numBarkBands * np.sum(NL, axis=1)
+        # Spectral averaging, Eq. (90)
+        NiLTilde = 24 * np.mean(NL, axis=1)
+
+        # Setting to zero if it is less than zero, Eq. (91)
         NTilde = np.maximum(NiLTilde, 0)
 
+        # Computing the MOV, Eq. (92)
         NLrmsB = np.sqrt(np.mean(np.square(NTilde), axis=1))
 
         # Mean across channels
         NLrmsB = np.mean(NLrmsB, axis=0)
         return NLrmsB
+
+    def loudnessTest(self, Ntot_T, Ntot_R):
+        """Performs the loudness test (page 36).
+
+        Inputs :
+        --------
+        ``Ntot_T`` : Array-like
+            Total noise loudness of the tested signal
+        ``Ntot_R`` : Array-like
+            Total noise loudness of the reference signal
+
+        Returns :
+        ---------
+        ``loudnessTest_idx`` : int
+            Index of the first frame to fulfill the test.
+        """
+        Lt = 0.1  # Threshold
+        numChannels, numFrames = Ntot_T.shape
+
+        loudnessTest_idx = 0
+        loudEnough = False
+
+        while not loudEnough:
+            for c in range(numChannels):
+                if (
+                    Ntot_T[c, loudnessTest_idx] >= Lt
+                    and Ntot_R[c, loudnessTest_idx] >= Lt
+                ):
+                    loudEnough = True
+                else:
+                    loudnessTest_idx += 1
+
+        # Adding the additional delay of 50ms Noff
+        loudnessTest_idx += self.Noff
+
+        if loudnessTest_idx < self.Ndel:
+            loudnessTest_idx = self.Ndel
+
+        return loudnessTest_idx
 
     def compute_bandwidth(self, X_T, X_R):
         """
@@ -173,11 +219,9 @@ class Mixin:
         X_R_dB = self.dB20(X_R)
 
         # Finding the threshold
-        higherFreq_hz = 21600
-        higherFreq_idx = int(self.numFftBands * higherFreq_hz / self.sr_hz)
-
+        higherFreq_hz = 21586
+        higherFreq_idx = int(self.NF * higherFreq_hz / self.sr_hz)
         thresholdLevel = np.amax(X_T_dB[:, higherFreq_idx:, :], axis=1)
-        # thresholdLevel = X_T_dB[threshold_idx]
 
         # Finding KR and KT
         start_idx = np.ones((numChannels, numFrames), dtype=np.int32) * higherFreq_idx
@@ -185,13 +229,13 @@ class Mixin:
             X_dB=X_R_dB, threshold_dB=thresholdLevel, gap_dB=10, start_idx=start_idx
         )
         KT = self.bandwidthSearch(
-            X_dB=X_R_dB, threshold_dB=thresholdLevel, gap_dB=5, start_idx=KR
+            X_dB=X_T_dB, threshold_dB=thresholdLevel, gap_dB=5, start_idx=KR
         )
         # computing the means
-        weigths_R = np.where(KR >= 346, 1, 0)
+        weigths_R = np.where(KR > 346, 1, 0)
         W_R = np.sum(KR * weigths_R, axis=1) / np.sum(weigths_R, axis=1)
 
-        weigths_T = np.where(KT >= 346, 1, 0)
+        weigths_T = np.where(KT > 346, 1, 0) * weigths_R
         W_T = np.sum(KT * weigths_T, axis=1) / np.sum(weigths_T, axis=1)
 
         ## Mean across channels
@@ -237,45 +281,6 @@ class Mixin:
 
         return bandwidth_idx
 
-    def loudnessTest(self, Ntot_T, Ntot_R):
-        """Performs the loudness test (page 36).
-
-        Inputs :
-        --------
-        ``Ntot_T`` : Array-like
-            Total noise loudness of the tested signal
-        ``Ntot_R`` : Array-like
-            Total noise loudness of the reference signal
-
-        Returns :
-        ---------
-        ``loudnessTest_idx`` : int
-            Index of the first frame to fulfill the test.
-        """
-        Lt = 0.1  # Threshold
-        numChannels, numFrames = Ntot_T.shape
-
-        loudnessTest_idx = 0
-        loudEnough = False
-
-        while not loudEnough:
-            for c in range(numChannels):
-                if (
-                    Ntot_T[c, loudnessTest_idx] >= Lt
-                    and Ntot_R[c, loudnessTest_idx] >= Lt
-                ):
-                    loudEnough = True
-                else:
-                    loudnessTest_idx += 1
-
-        # Adding the additional delay of 50ms Noff
-        loudnessTest_idx += self.Noff
-
-        if loudnessTest_idx < self.Ndel:
-            loudnessTest_idx = self.Ndel
-
-        return loudnessTest_idx
-
     def get_maskThreshold(self):
         m_dB = 3 * np.ones((self.numBarkBands))
         k = np.arange(self.numBarkBands)
@@ -289,14 +294,14 @@ class Mixin:
     ):
         numChannels, numBins, numFrames = EbN.shape
         # Masking threshold, Eq. (114)
-        M = self.gm * EsTilde_R
+        M = EsTilde_R * self.gm
 
         # Noise to mask ratio, Eq (116)
         RNM = EbN / M
 
         ## Total NMR
         # Eq. (117)
-        RNMtot = np.log10(np.mean(RNM, axis=(1, 2)))
+        RNMtot = self.dB10(np.mean(RNM, axis=(1, 2)))
 
         ## Relative disturbed frames
         # Eq. (118)
@@ -317,43 +322,39 @@ class Mixin:
     def detectionProbability(self, EsTilde_T, EsTilde_R):
         numChannels, numBins, numFrames = EsTilde_T.shape
 
+        # Converting to dBs, Eq. (121)
         EsTilde_T_dB = self.dB10(EsTilde_T)
         EsTilde_R_dB = self.dB10(EsTilde_R)
-
-        # Asymmetric excitation
+        EdB = EsTilde_R_dB - EsTilde_T_dB
+        # Asymmetric excitation, Eq. (120)
         L = np.where(
             EsTilde_R > EsTilde_T,
             0.3 * EsTilde_R_dB + 0.7 * EsTilde_T_dB,
             EsTilde_T_dB,
         )
 
-        # Detection step size
+        # Detection step size, Eq (122)
         c0 = -0.198719
-        c_list = np.array(
-            [
-                0.0550197,
-                0.00102438,
-                5.05622e-6,
-                9.01033e-11,
-            ]
-        ).reshape(1, 1, 1, 4)
+        c1 = 0.0550197
+        c2 = -0.00102438
+        c3 = 5.05622e-6
+        c4 = 9.01033e-11
+
         d1 = 5.95072
         d2 = 6.39468
         gamma = 1.71332
 
         # Eq. (122)
-        L = L.reshape(numChannels, numBins, numFrames, 1)
-        s = c0 + np.sum(np.power(L, c_list) + d1 * np.power(d2 / L, gamma), 3)
-        L = L.reshape(numChannels, numBins, numFrames)
-        s = np.where(L > 0, s, np.power(10, 30))
+        s = c0 + L * (c1 + L * (c2 + L * (c3 + L * c4))) + d1 * np.power(d2 / L, gamma)
+        s = np.where(L > 0, s, 1e30)
 
         # Steepness of slope, Eq. (124)
         b = np.where(EsTilde_R > EsTilde_T, 4, 6)
         # Probability of detection, Eq. (123)
-        pc = 1 - np.power(0.5, np.power(((EsTilde_R_dB - EsTilde_T_dB) / s), b))
+        pc = 1 - np.power(0.5, np.power(((EdB) / s), b))
 
         # Number of steps above the threshold, Eq. (125)
-        qc = np.abs((EsTilde_R_dB - EsTilde_T_dB).astype(np.int32)) / s
+        qc = np.abs((EdB).astype(np.int32)) / s
 
         # Total probability of detection, Eqs (126) and (127)
         Pb = 1 - np.prod(1 - np.amax(pc, axis=0), axis=0)
@@ -362,7 +363,7 @@ class Mixin:
         ## MFPD_B Computations
         # Filtered probability of detection, Eq. (128)
         c0 = 0.9
-        PbTilde = scipy.signal.lfilter(b=[1 - c0], a=[c0], x=Pb)
+        PbTilde = scipy.signal.lfilter(b=[1 - c0], a=[1, -c0], x=Pb)
 
         # Maximum filtered probability of detection, Eqs. (129) and (130)
         PM = np.amax(PbTilde)
@@ -387,7 +388,7 @@ class Mixin:
     def errorHarmonicStructure(self, X_T, X_R, x_T, x_R):
         numChannels, numBands, numFrames = X_T.shape
         # Difference weighted log spectra, Eq. (133)
-        D = 2 * np.log(np.abs(X_T) / np.abs(X_R))
+        D = np.log(np.square(X_T / X_R))
 
         Lmax = 256
         NL = Lmax
@@ -409,7 +410,7 @@ class Mixin:
         H = self.get_hannWindow(NF=NL).reshape(1, NL, 1)
         Cw = H * (C - np.mean(C, axis=1, keepdims=True))
 
-        S = np.square(np.abs(np.fft.rfft(Cw, axis=1))) / NL
+        S = np.square(np.abs(np.fft.rfft(Cw, axis=1) / NL))
 
         EH_max = np.zeros((numChannels, numFrames))
 
@@ -435,7 +436,11 @@ class Mixin:
 
         threshold_idx = self.find_energyThreshold(x_T=x_T, x_R=x_R, X_T=X_T)
 
-        EHB = 1000 * np.sum(EH_max[:, threshold_idx], axis=1) / np.sum(threshold_idx)
+        EHB = (
+            1000
+            * np.sum(EH_max * threshold_idx.reshape(1, numFrames), axis=1)
+            / np.sum(threshold_idx)
+        )
 
         # Mean across channels
         EHB = np.mean(EHB)

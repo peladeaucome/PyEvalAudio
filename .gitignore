@@ -7,3 +7,5 @@ bibliography.bib
 PEAQ-to-python*
 */__pycache__/*
 *.pyc
+
+Data/*

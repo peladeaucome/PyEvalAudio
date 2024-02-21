@@ -85,7 +85,7 @@ class Mixin:
         Es_R: npt.ArrayLike,
     ) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
 
-        # \bar{E}_R, \bar{E}_T
+        # Average loudness, Eq. (65)
         Ebar_R: npt.ArrayLike = self.AR_filter(
             X=np.power(Es_R, 0.3), alpha=self.timeToFreqAlpha
         )
@@ -99,8 +99,7 @@ class Mixin:
         Es_R_prev = np.zeros_like(Es_R)
         Es_R_prev[:, :, 1:] = Es_R[:, :, :-1]
 
-        # \bar{D}_R, \bar{D}_T
-        self.Fss_fft = self.sr_hz / 1024
+        # Average loudness difference, Eq. (66)
         Dbar_R = self.AR_filter(
             X=np.abs(np.power(Es_R, 0.3) - np.power(Es_R_prev, 0.3)) * self.Fss_fft,
             alpha=self.timeToFreqAlpha,
@@ -110,7 +109,7 @@ class Mixin:
             alpha=self.timeToFreqAlpha,
         )
 
-        # M_T, M_R
+        # MOdulation parameters, Eq. (67)
         M_T: npt.ArrayLike = Dbar_T / (1 + Ebar_T / 0.3)
         M_R: npt.ArrayLike = Dbar_R / (1 + Ebar_R / 0.3)
 

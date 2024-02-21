@@ -1,13 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy.typing as npt
-import MOVs
-import pattern_processing
-import utils
-import time_to_freq
-import MOVs
-import ODG
-
+from . import utils
+from . import time_to_freq
+from . import pattern_processing
+from . import MOVs
+from . import ODG
 
 class PEAQ(
     utils.Mixin, time_to_freq.Mixin, pattern_processing.Mixin, MOVs.Mixin, ODG.Mixin
@@ -85,6 +83,8 @@ class PEAQ(
 
     def compute_allMOVs(
         self,
+        x_T,
+        x_R,
         X_T,
         X_R,
         Es_T,
@@ -136,7 +136,6 @@ class PEAQ(
                 RelDistFrames,
             ]
         )
-        print(MOVs_vect)
         return MOVs_vect
 
     def two_f_model(self, x_T, x_R):
@@ -156,18 +155,8 @@ class PEAQ(
         patt = self.patternProcessing(Es_T, Es_R)
         EP_T, EP_R, M_T, M_R, Ebar_R, Ntot_T, Ntot_R = patt
 
-        plt.pcolormesh(M_T[0])
-        plt.show()
-        plt.pcolormesh(M_R[0])
-        plt.show()
-        print(self.Fss_fft)
-        print('ndel', self.Ndel)
         startFrame_idx, endFrame_idx = self.get_dataBoundary(x_T=x_T, x_R=x_R)
 
-        # Ntot_T, Ntot_R = crop_multiple(
-        #    Ntot_T, Ntot_R, start_idx=startFrame_idx, end_idx=endFrame_idx
-        # )
-        print("start and end frames", startFrame_idx, endFrame_idx)
         (
             X_T,
             X_R,
@@ -202,7 +191,12 @@ class PEAQ(
             end_idx=endFrame_idx,
         )
 
+        x_T = x_T[:,startFrame_idx*self.hopSize:endFrame_idx*self.hopSize+self.NF]
+        x_R = x_R[:,startFrame_idx*self.hopSize:endFrame_idx*self.hopSize+self.NF]
+
         MOVs_vect = self.compute_allMOVs(
+            x_T,
+            x_R,
             X_T,
             X_R,
             Es_T,
@@ -219,9 +213,28 @@ class PEAQ(
             Ntot_R,
         )
 
+        self.print_movs(MOVs_vect)
         ODG = self.ODG(MOVs_vect=MOVs_vect)
         return ODG
 
+    @staticmethod
+    def print_movs(MOVs_vect):
+        MOVs_names = [
+            'BandwidthRef ',
+            'BandwidthTest',
+            'Total NMR    ',
+            'WinModDiff1  ',
+            'ADB          ',
+            'EHS          ',
+            'AvgModDiff1  ',
+            'AvgModDiff2  ',
+            'RmsNoiseLoud ',
+            'MFPD         ',
+            'RelDistFrames']
+        
+        for idx in range(len(MOVs_vect)):
+            print(f'{MOVs_names[idx]}: {MOVs_vect[idx]}')
+        
 
 class Data:
     def __init__(self, x, Amax):
@@ -387,9 +400,8 @@ if __name__ == "__main__":
     n = np.arange(numSamples)
     n = n.reshape(1, numSamples)
     amp = Amax * 100 / peaq.idB20(92)
-    print("amp",amp)
     x_R = np.sin(n * 2 * np.pi * f / peaq.sr_hz) * amp * (np.sin(n*2*np.pi*16/ peaq.sr_hz)+1)/2 + np.random.randn(numSamples)*amp/100 # ref signal
-    x_T = x_R + np.random.randn(numSamples)*amp/20*(np.sin(n*2*np.pi*3/ peaq.sr_hz)+1)/2 # test signal
+    x_T = x_R + np.random.randn(numSamples)*amp/2*(np.sin(n*2*np.pi*3/ peaq.sr_hz)+1)/2 # test signal
 
     x_R = x_R.reshape(1, numSamples)
     x_T = x_T.reshape(1, numSamples)
