@@ -6,12 +6,35 @@ class Mixin:
     def __init__(self):
 
         timeConstants = self.get_TimeConstants(
-            f=self.f_c[:, 0], tau100_s=0.030, tauMin_s=0.008
+            f=self.f_c[:, 0], tau100_s=0.050, tauMin_s=0.008
         ).reshape(1, self.numBarkBands)
 
         self.patternProcessingAlpha: npt.ArrayLike = np.exp(
             -1 / (self.Fss_fft * timeConstants)
         )
+
+        # s
+        self.s = self.get_thresholdIndex(f=self.f_c).reshape(1, self.numBarkBands, 1)
+        # E_t
+        self.Et = self.get_excitationThreshold(f=self.f_c).reshape(
+            1, self.numBarkBands, 1
+        )
+
+    def get_thresholdIndex(self, f):
+        # Threshold index, eq. (69)
+        s_dB = (
+            -2
+            - 2.05 * np.arctan(f * 0.00025)
+            - 0.75 * np.arctan(np.square(f * 0.000625))
+        )
+        s = self.idB10(s_dB)
+        return s
+
+    def get_excitationThreshold(self, f):
+        # Excitation threshold, eq. (70)
+        Et_dB = 3.64 * np.power((f / 1000), -0.8)
+        Et = self.idB10(Et_dB)
+        return Et
 
     def frequencySmoothing(self, R: npt.ArrayLike):
         numChannels, numBands, numFrames = R.shape
@@ -133,21 +156,22 @@ class Mixin:
         c: float = 1.07664
         E0: float = 1e4
 
+        #Specific loudness patterns, Eq. (68)
         commonFactor = c * np.power(self.Et / (self.s * E0), 0.23).reshape(
             1, self.numBarkBands, 1
         )
 
-        # N_R, N_T
         N_T = np.power(1 - self.s + self.s * EsTilde_T / self.Et, 0.23) - 1
         N_T = N_T * commonFactor
 
         N_R = np.power(1 - self.s + self.s * EsTilde_R / self.Et, 0.23) - 1
         N_R = N_R * commonFactor
 
+        # Total loudness, Eq. (71)
         Ntot_T: npt.ArrayLike = (
-            np.sum(np.maximum(N_T, 0), axis=1) * 24 / self.numBarkBands
+            np.mean(np.maximum(N_T, 0), axis=1) * 24
         )
         Ntot_R: npt.ArrayLike = (
-            np.sum(np.maximum(N_R, 0), axis=1) * 24 / self.numBarkBands
+            np.mean(np.maximum(N_R, 0), axis=1) * 24
         )
         return Ntot_T, Ntot_R

@@ -63,13 +63,7 @@ class Mixin:
             -1 / (self.Fss_fft * timeConstants)
         )
 
-        # s
-        self.s = self.get_thresholdIndex(f=self.f_c).reshape(1, self.numBarkBands, 1)
-        # E_t
-        self.Et = self.get_excitationThreshold(f=self.f_c).reshape(
-            1, self.numBarkBands, 1
-        )
-
+        
 
     def get_hannWindow(self, NF: int = 1025) -> npt.ArrayLike:
         """
@@ -278,22 +272,6 @@ class Mixin:
         E_f = self.AR_filter(Es, self.timeToFreqAlpha)
         out_pattern = np.maximum(E_f, Es)
         return out_pattern
-
-    
-
-    def get_thresholdIndex(self, f):
-        s_dB = (
-            -2
-            - 2.05 * np.arctan(f * 0.00025)
-            - 0.75 * np.arctan(np.square(f * 0.000625))
-        )
-        s = self.idB10(s_dB)
-        return s
-
-    def get_excitationThreshold(self, f):
-        Et_dB = 3.64 * np.power((f / 1000), -0.8)
-        Et = self.idB10(Et_dB)
-        return Et
 
     def get_TimeConstants(self, f, tauMin_s=0.008, tau100_s=0.03):
         tau_s = np.zeros((1, self.numBarkBands))

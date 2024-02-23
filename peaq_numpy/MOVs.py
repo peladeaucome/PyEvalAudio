@@ -75,9 +75,8 @@ class Mixin:
         intermediate_term = np.power(intermediate_term / L, 4)
 
         MWdiff1B = np.sqrt(np.mean(intermediate_term, axis=1))
-         # Mean across stereo channels
-        MWdiff1B = np.mean(MWdiff1B) 
-
+        # Mean across stereo channels
+        MWdiff1B = np.mean(MWdiff1B)
 
         ## AvgModDiff1B
         # Temporal weighting, Eq (78)
@@ -86,32 +85,33 @@ class Mixin:
         )
 
         # Temporally weighted time average, Eq. (77)
-        MAdiff1B = np.sum(Mdiff1bTilde * W1B, axis=1) / np.sum(W1B, axis=1)
-
+        MAdiff1B = np.sum(Mdiff1bTilde * W1B, axis=2) / np.sum(W1B, axis=2)
+        MAdiff1B = MAdiff1B.reshape(numChannels)
+        
         # Mean across channels
         MAdiff1B = np.mean(MAdiff1B)
 
-
         ## AvgModDiff2B
         # Instantaneous modulation difference, Eq. (79)
-        #Mdiff2B = (M_T - M_R) / (0.01 + M_R)
-        #Mdiff2B = np.where(M_T >= M_R, Mdiff2B, -0.1 * Mdiff2B)
+        # Mdiff2B = (M_T - M_R) / (0.01 + M_R)
+        # Mdiff2B = np.where(M_T >= M_R, Mdiff2B, -0.1 * Mdiff2B)
         Mdiff2B = np.where(
-            M_T >= M_R,
-            (M_T - M_R) / (0.01 + M_R),
-            0.1*(M_R - M_T) / (0.01 + M_R)
+            M_T >= M_R, (M_T - M_R) / (0.01 + M_R), 0.1 * (M_R - M_T) / (0.01 + M_R)
         )
-                           
+
         # Average over bands, Eq. (80)
         Mdiff2BTilde = 100 * np.mean(Mdiff2B, axis=1)
 
         # Temporal weighting, Eq.(82) & (78)
         W2B = np.sum(
-            Ebar_R / (Ebar_R + 100 * np.power(self.E_IN, 0.3)), axis=1, keepdims=True
+            Ebar_R / (Ebar_R + 100 * np.power(self.E_IN, 0.3)),
+            axis=1,
+            keepdims=True,
         )
 
         # Temporally weighted time average, Eq. (81)
-        MAdiff2B = np.sum(W2B * Mdiff2BTilde, axis=1) / np.sum(W2B, axis=1)
+        MAdiff2B = np.sum(W2B * Mdiff2BTilde, axis=2) / np.sum(W2B, axis=2)
+        MAdiff2B = MAdiff2B.reshape(numChannels)
 
         # Mean across channels
         MAdiff2B = np.mean(MAdiff2B)

@@ -12,12 +12,17 @@ class PEAQ(
 ):
     """The advanced-mode is not used for now."""
 
-    def __init__(self, mode="basic", Amax=32768):
+    def __init__(self, mode="basic", Amax=32768, verbose=True):
 
+        if verbose:
+            print('Init start')
         time_to_freq.Mixin.__init__(self, mode=mode, Amax=Amax)
         pattern_processing.Mixin.__init__(self)
         MOVs.Mixin.__init__(self)
         ODG.Mixin.__init__(self)
+
+        if verbose:
+            print('Init ended')
 
     def timeToFrequencyDomain(self, x_T, x_R):
         """
