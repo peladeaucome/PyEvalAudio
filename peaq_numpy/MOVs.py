@@ -55,9 +55,9 @@ class Mixin:
         numChannels, _, N = M_T.shape
 
         # Delayed averaging
-        M_T = M_T[:, :, self.Ndel :]
-        M_R = M_R[:, :, self.Ndel :]
-        Ebar_R = Ebar_R[:, :, self.Ndel :]
+        M_T = M_T.copy()[:, :, self.Ndel :]
+        M_R = M_R.copy()[:, :, self.Ndel :]
+        Ebar_R = Ebar_R.copy()[:, :, self.Ndel :]
 
         ## WinModDiff1B
         # Instantaneous modulation difference, Eq. (73)
@@ -75,7 +75,9 @@ class Mixin:
         intermediate_term = np.power(intermediate_term / L, 4)
 
         MWdiff1B = np.sqrt(np.mean(intermediate_term, axis=1))
-        MWdiff1B = np.mean(MWdiff1B)  # Mean across stereo channels
+         # Mean across stereo channels
+        MWdiff1B = np.mean(MWdiff1B) 
+
 
         ## AvgModDiff1B
         # Temporal weighting, Eq (78)
@@ -89,16 +91,24 @@ class Mixin:
         # Mean across channels
         MAdiff1B = np.mean(MAdiff1B)
 
+
         ## AvgModDiff2B
         # Instantaneous modulation difference, Eq. (79)
-        Mdiff2B = np.abs((M_T - M_R) / (0.01 + M_R))
-        Mdiff2B = np.where(M_T >= M_R, Mdiff2B, -0.1 * Mdiff2B)
-
+        #Mdiff2B = (M_T - M_R) / (0.01 + M_R)
+        #Mdiff2B = np.where(M_T >= M_R, Mdiff2B, -0.1 * Mdiff2B)
+        Mdiff2B = np.where(
+            M_T >= M_R,
+            (M_T - M_R) / (0.01 + M_R),
+            0.1*(M_R - M_T) / (0.01 + M_R)
+        )
+                           
         # Average over bands, Eq. (80)
         Mdiff2BTilde = 100 * np.mean(Mdiff2B, axis=1)
 
         # Temporal weighting, Eq.(82) & (78)
-        W2B = W1B
+        W2B = np.sum(
+            Ebar_R / (Ebar_R + 100 * np.power(self.E_IN, 0.3)), axis=1, keepdims=True
+        )
 
         # Temporally weighted time average, Eq. (81)
         MAdiff2B = np.sum(W2B * Mdiff2BTilde, axis=1) / np.sum(W2B, axis=1)
@@ -112,7 +122,7 @@ class Mixin:
         self, EP_T, EP_R, M_R, M_T, alpha, T0, S0
     ) -> npt.ArrayLike:
 
-        beta = np.exp(-alpha * (EP_T / EP_R - 1))
+        beta = np.exp(-alpha * ((EP_T - EP_R) / EP_R))
 
         E_t = self.E_IN.copy()
         E_t = E_t.reshape(1, self.numBarkBands, 1)
@@ -172,21 +182,20 @@ class Mixin:
         Lt = 0.1  # Threshold
         numChannels, numFrames = Ntot_T.shape
 
-        loudnessTest_idx = 0
+        loudnessTest_idx = -1
         loudEnough = False
 
-        while not loudEnough:
+        while (not loudEnough) and (loudnessTest_idx < numFrames):
+            loudnessTest_idx += 1
             for c in range(numChannels):
                 if (
                     Ntot_T[c, loudnessTest_idx] >= Lt
                     and Ntot_R[c, loudnessTest_idx] >= Lt
                 ):
                     loudEnough = True
-                else:
-                    loudnessTest_idx += 1
 
         # Adding the additional delay of 50ms Noff
-        loudnessTest_idx += self.Noff
+        loudnessTest_idx = max(self.Noff, loudnessTest_idx)
 
         if loudnessTest_idx < self.Ndel:
             loudnessTest_idx = self.Ndel

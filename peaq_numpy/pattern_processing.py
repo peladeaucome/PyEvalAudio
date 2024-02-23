@@ -13,6 +13,24 @@ class Mixin:
             -1 / (self.Fss_fft * timeConstants)
         )
 
+    def frequencySmoothing(self, R: npt.ArrayLike):
+        numChannels, numBands, numFrames = R.shape
+
+        
+        Ra = np.zeros_like(R)
+
+        for k in range(numBands):
+            # Eq. (64)
+            M1 = min(self.FFTM1, k)
+            M2 = min(self.FFTM2, self.numBarkBands - 1 - k)
+
+            # Frequency smoothed terms, Eq. (62)
+            for i in range(k - M1, k + M2 + 1):
+                Ra[:, k, :] += R[:, i, :]
+            Ra[:, k, :] /= M1 + M2 + 1
+
+        return Ra
+
     def excitationPatternProcessing(
         self,
         EsTilde_T: npt.ArrayLike,
@@ -20,62 +38,53 @@ class Mixin:
     ):
         numChannels, numBands, numFrames = EsTilde_R.shape
 
-        EsTilde_R = self.AR_filter(X=EsTilde_R, alpha=self.patternProcessingAlpha)
+        # Time spreading, Eq. (56)
+        P_R = self.AR_filter(X=EsTilde_R, alpha=self.patternProcessingAlpha)
 
-        EsTilde_T = self.AR_filter(X=EsTilde_T, alpha=self.patternProcessingAlpha)
+        P_T = self.AR_filter(X=EsTilde_T, alpha=self.patternProcessingAlpha)
 
-        momentaryCorrection = np.sum(np.sqrt(EsTilde_T * EsTilde_R), axis=1)
-        momentaryCorrection = momentaryCorrection / np.sum(EsTilde_T, axis=1)
-        momentaryCorrection = np.square(momentaryCorrection).reshape(
+        # Momentary correction factor, Eq. (57)
+        C_L = np.sum(np.sqrt(P_T * P_R), axis=1)
+        C_L = C_L / np.sum(P_T, axis=1)
+        C_L = np.square(C_L).reshape(
             numChannels, 1, numFrames
         )
 
-        idx = np.where(momentaryCorrection < 1)
+        # Correcting the excitation patterns, Eq. (58)
+        idx = np.where(C_L <= 1)
         # E_{LR}, E_{LT}
-        patternMomentaryCorrected_ref = EsTilde_R
-        patternMomentaryCorrected_ref[idx] = EsTilde_R[idx] / momentaryCorrection[idx]
+        EL_R = EsTilde_R
+        EL_R[idx] = EsTilde_R[idx] / C_L[idx]
 
-        patternMomentaryCorrected_test = EsTilde_T * momentaryCorrection
-        patternMomentaryCorrected_test[idx] = EsTilde_T[idx]
+        EL_T = EsTilde_T * C_L
+        EL_T[idx] = EsTilde_T[idx]
 
-        correlation_num = self.AR_filter(
-            X=patternMomentaryCorrected_ref * patternMomentaryCorrected_test,
+        # Time smoothed correlation, Eq. (59)
+        Rn = self.AR_filter(
+            X=EL_T * EL_R,
             alpha=self.patternProcessingAlpha,
         )
-        correlation_den = self.AR_filter(
-            X=patternMomentaryCorrected_ref * patternMomentaryCorrected_ref,
+        Rd = self.AR_filter(
+            X=EL_R * EL_R,
             alpha=self.patternProcessingAlpha,
         )
 
-        correlation_ref = np.ones_like(correlation_num)
-        correlation_test = np.ones_like(correlation_den)
+        # Auxiliary signals, Eq. (60)
+        R_R = np.where(Rn >= Rd, 1, Rn / Rd)
+        R_T = np.where(Rn >= Rd, Rd / Rn, 1)
 
-        cond = np.asarray(correlation_num < correlation_den)
+        # Frequency smoothing, Eq. (62)
+        Ra_R = self.frequencySmoothing(R_R)
+        Ra_T = self.frequencySmoothing(R_T)
 
-        idx = cond.nonzero()
-        correlation_ref[idx] = correlation_num[idx] / correlation_den[idx]
+        # Pattern correction factors, Eq. (61)
+        PC_R = self.AR_filter(X=Ra_R, alpha=self.patternProcessingAlpha)
+        PC_T = self.AR_filter(X=Ra_T, alpha=self.patternProcessingAlpha)
 
-        idx = (1 - cond).nonzero()
-        correlation_test[idx] = correlation_den[idx] / correlation_num[idx]
 
-        correlation_ref[:, 0, :] = 1.0
-        correlation_test[:, 0, :] = 1.0
-
-        correlationFreqSmooth_ref = self.frequencySmoothing(correlation_ref)
-        correlationFreqSmooth_test = self.frequencySmoothing(correlation_test)
-
-        # P_{CR}, P_{CT}
-        patternCorrectionFactor_ref = self.AR_filter(
-            X=correlationFreqSmooth_ref, alpha=self.patternProcessingAlpha
-        )
-        patternCorrectionFactor_test = self.AR_filter(
-            X=correlationFreqSmooth_test, alpha=self.patternProcessingAlpha
-        )
-
-        # E_{PR}, E_{PT}
-        EP_R = patternMomentaryCorrected_ref / patternCorrectionFactor_ref
-
-        EP_T = patternMomentaryCorrected_test / patternCorrectionFactor_test
+        # Spectrally adapted patterns, Eq. (64)
+        EP_T = EL_T * PC_T
+        EP_R = EL_R * PC_R
 
         return EP_T, EP_R
 
@@ -87,10 +96,10 @@ class Mixin:
 
         # Average loudness, Eq. (65)
         Ebar_R: npt.ArrayLike = self.AR_filter(
-            X=np.power(Es_R, 0.3), alpha=self.timeToFreqAlpha
+            X=np.power(Es_R, 0.3), alpha=self.patternProcessingAlpha
         )
         Ebar_T: npt.ArrayLike = self.AR_filter(
-            X=np.power(Es_T, 0.3), alpha=self.timeToFreqAlpha
+            X=np.power(Es_T, 0.3), alpha=self.patternProcessingAlpha
         )
 
         Es_T_prev = np.zeros_like(Es_T)
@@ -102,18 +111,17 @@ class Mixin:
         # Average loudness difference, Eq. (66)
         Dbar_R = self.AR_filter(
             X=np.abs(np.power(Es_R, 0.3) - np.power(Es_R_prev, 0.3)) * self.Fss_fft,
-            alpha=self.timeToFreqAlpha,
+            alpha=self.patternProcessingAlpha,
         )
         Dbar_T = self.AR_filter(
             X=np.abs(np.power(Es_T, 0.3) - np.power(Es_T_prev, 0.3)) * self.Fss_fft,
-            alpha=self.timeToFreqAlpha,
+            alpha=self.patternProcessingAlpha,
         )
 
         # MOdulation parameters, Eq. (67)
         M_T: npt.ArrayLike = Dbar_T / (1 + Ebar_T / 0.3)
         M_R: npt.ArrayLike = Dbar_R / (1 + Ebar_R / 0.3)
 
-    
         return M_T, M_R, Ebar_R
 
     def loudnessCalculation(

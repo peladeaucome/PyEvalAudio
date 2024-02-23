@@ -279,30 +279,7 @@ class Mixin:
         out_pattern = np.maximum(E_f, Es)
         return out_pattern
 
-    def frequencySmoothing(self, correlation: npt.ArrayLike):
-        numChannels, numBands, numFrames = correlation.shape
-
-        k = np.arange(self.numBarkBands, dtype=np.int16).reshape(
-            1, self.numBarkBands, 1, 1
-        )
-
-        M1 = np.minimum(self.FFTM1, k)
-        M2 = np.minimum(self.FFTM2, self.numBarkBands - 1 - k)
-
-        # indices are (k, i)
-        i = np.arange(self.numBarkBands, dtype=np.int16).reshape(
-            1, 1, self.numBarkBands, 1
-        )
-        passingMatrix = np.zeros((1, numBands, numBands, 1))
-        # idx = np.where()
-        passingMatrix[(i >= k - M1)] = 1.0
-        passingMatrix[(i > k + M2)] = 0
-
-        out = correlation.reshape(numChannels, numBands, 1, numFrames) * passingMatrix
-        norm = 1 / (M1 + M2 + 1).reshape(1, self.numBarkBands, 1)
-        out = np.sum(out, axis=2) / norm  # Sum over i and normalize
-
-        return out
+    
 
     def get_thresholdIndex(self, f):
         s_dB = (
