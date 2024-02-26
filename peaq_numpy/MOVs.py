@@ -87,7 +87,7 @@ class Mixin:
         # Temporally weighted time average, Eq. (77)
         MAdiff1B = np.sum(Mdiff1bTilde * W1B, axis=2) / np.sum(W1B, axis=2)
         MAdiff1B = MAdiff1B.reshape(numChannels)
-        
+
         # Mean across channels
         MAdiff1B = np.mean(MAdiff1B)
 
@@ -335,6 +335,7 @@ class Mixin:
         EsTilde_T_dB = self.dB10(EsTilde_T)
         EsTilde_R_dB = self.dB10(EsTilde_R)
         EdB = EsTilde_R_dB - EsTilde_T_dB
+
         # Asymmetric excitation, Eq. (120)
         L = np.where(
             EsTilde_R > EsTilde_T,
@@ -394,10 +395,18 @@ class Mixin:
 
         return MFPD_B, ADB_B
 
+    @staticmethod
+    def dot(Di, Dl):
+        return np.sum(Di*Dl, axis=1)
+    
+    @staticmethod
+    def squaredNorm(Di):
+        return np.sum(np.abs(np.square(Di)), axis=1)
+    
     def errorHarmonicStructure(self, X_T, X_R, x_T, x_R):
         numChannels, numBands, numFrames = X_T.shape
         # Difference weighted log spectra, Eq. (133)
-        D = np.log(np.square(X_T / X_R))
+        D = 2 * np.log(X_T / X_R)
 
         Lmax = 256
         NL = Lmax
@@ -406,58 +415,55 @@ class Mixin:
         L = 512
 
         # Normalized autocorrelation, Eq. (135)
-        C = np.zeros((numChannels, NL, numFrames))
+        C = np.zeros((numChannels, Lmax, numFrames))
 
         D0 = D[:, 0:M, :]
-        for l in range(NL):
-            Dl = D[:, l : l + M, :]
-            C[:, l, :] = np.sum(D0 * Dl, axis=1) / np.sqrt(
-                np.sum(D0 * D0, axis=1) * np.sum(Dl * Dl, axis=1)
-            )
+        for l in range(0, Lmax):
+            Dl = D[:, l + 1 : l + 1 + M, :]
+            res = self.dot(D0, Dl)
+            res /= np.sqrt(self.squaredNorm(D0) * self.squaredNorm(Dl))
+            C[:, l, :] = res
 
-        ## Windowed correlation, Eqs. (140), (141), (142)
-        H = self.get_hannWindow(NF=NL).reshape(1, NL, 1)
-        Cw = H * (C - np.mean(C, axis=1, keepdims=True))
+        # Windowed correlation, Eqs. (140), (141), (142)
+        # H = self.get_hannWindow(NF=NL).reshape(1, NL, 1)
+        H = self.get_hannWindow(NF=NL).reshape(1, NL, 1) / NL
 
-        S = np.square(np.abs(np.fft.rfft(Cw, axis=1) / NL))
+        Cmean = np.mean(C, axis=1, keepdims=True)
+        Cw = H * (C - Cmean)
+
+        S = np.square(np.abs(np.fft.rfft(Cw, axis=1, n=NL)))
 
         EH_max = np.zeros((numChannels, numFrames))
 
+        print(S.shape)
+        print(NL//2)
         for channel_idx in range(numChannels):
             for frame_idx in range(numFrames):
-                valley_idx = 1
-                while (valley_idx <= NL // 2) and (
-                    S[channel_idx, valley_idx, frame_idx]
-                    <= S[channel_idx, valley_idx - 1, frame_idx]
-                ):
-                    valley_idx += 1
+                val_prev = S[channel_idx, 0, frame_idx]
+                
+                for n in range(1, NL // 2):
+                    val = S[channel_idx, n, frame_idx]
+                    if val > val_prev:
+                        print('haha')
+                        if val > EH_max[channel_idx, frame_idx]:
+                            EH_max[channel_idx, frame_idx] = val
 
-                if valley_idx < NL // 2:
-                    peak_idx = (
-                        np.argmax(S[channel_idx, valley_idx:, frame_idx]) + valley_idx
-                    )
-                else:
-                    peak_idx = -1
-
-                EH_max[channel_idx, frame_idx] = S[channel_idx, peak_idx, frame_idx]
-
-        ### Error Harmonic structure with energy threshold
+        ## Error Harmonic structure with energy threshold
 
         threshold_idx = self.find_energyThreshold(x_T=x_T, x_R=x_R, X_T=X_T)
 
-        EHB = (
-            1000
-            * np.sum(EH_max * threshold_idx.reshape(1, numFrames), axis=1)
-            / np.sum(threshold_idx)
-        )
+        EHB = 1000 * np.sum(EH_max * threshold_idx, axis=1) / np.sum(threshold_idx)
+        print(np.where(threshold_idx < 0.5))
 
         # Mean across channels
         EHB = np.mean(EHB)
+
         return EHB
 
     def find_energyThreshold(self, x_T, x_R, X_T):
         # Energy threshold, Eq. (145)
         Athr = 8000 * np.square(self.Amax / 32768)
+        # Athr=8000
         numChannels, _, numFrames = X_T.shape
 
         A_T = np.zeros((numChannels, numFrames))
@@ -465,28 +471,29 @@ class Mixin:
 
         # energy calculation, Eq. (146)
         for frame_idx in range(numFrames):
-            start_idx = frame_idx * self.hopSize + self.NF // 2
+            start_idx = frame_idx * self.hopSize + self.hopSize
             end_idx = frame_idx * self.hopSize + self.NF
             A_T[:, frame_idx] = np.sum(np.square(x_T[:, start_idx:end_idx]))
             A_R[:, frame_idx] = np.sum(np.square(x_R[:, start_idx:end_idx]))
 
-        A_T = A_T.reshape(numChannels, numFrames)
-        A_R = A_R.reshape(numChannels, numFrames)
+        # A_T = A_T.reshape(numChannels, numFrames)
+        # A_R = A_R.reshape(numChannels, numFrames)
 
         # indices where the signal is below the threshold, Eq. (147)
         idx_T = np.asarray(A_T < Athr, dtype=np.int32)
         idx_R = np.asarray(A_R < Athr, dtype=np.int32)
 
-        # Condition accros channels
-        idx_T = np.prod(idx_T, axis=0)
-        idx_R = np.prod(idx_R, axis=0)
+        # Condition accross channels
+        idx_T = np.prod(idx_T, axis=0, keepdims=True)
+        idx_R = np.prod(idx_R, axis=0, keepdims=True)
 
         # Condition across signals
         idx = idx_T * idx_R
 
-        # Now the 1s in idx indicate where both channels of both signals are under the threshold
-        idx = idx_T * idx_R
+        # Now the 1s in idx indicate where both channels of both signals are
+        # under the threshold
 
-        # Inverting the index
+        # Inverting the index so that the ones indicate where one of the signals
+        # is above the threshold
         idx = 1 - idx
         return idx

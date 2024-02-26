@@ -66,6 +66,7 @@ class Mixin:
 
     @staticmethod
     def sigmoid(x: npt.ArrayLike):
+        # Asymmetric sigmoid, Eq. (150)
         return 1 / (1 + np.exp(-x))
 
     def neuralNet(self, MOVs_vect_norm):
@@ -85,8 +86,14 @@ class Mixin:
 
         MOVs_vect_norm = self.scale_var(MOVs_vect, self.MOVs_min, self.MOVs_max)
 
-        ODG = self.neuralNet(MOVs_vect_norm)
+        # Distortion index, Eq. (149)
+        DI = self.neuralNet(MOVs_vect_norm)
 
+        #Objective grade difference, Eq. (151)
+        bmin = -3.98
+        bmax = 0.22
+        ODG = bmin + (bmax - bmin) * self.sigmoid(DI)
+        
         return ODG
 
 
