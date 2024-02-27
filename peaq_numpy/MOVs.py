@@ -23,28 +23,28 @@ class Mixin:
 
         L = 5  # Number of samples in a window
         Athr_over_L = Athr / L
-        #Athr_over_L=Athr
+        # Athr_over_L=Athr
 
         start_idx: int = 0
         val_R = np.mean(np.abs(x_R[:, start_idx : start_idx + L]), axis=1)
         # Finding the starting point
         while np.amax(val_R) < Athr_over_L:
-            val_R += (np.abs(x_R[:,start_idx+L]) - np.abs(x_R[:,start_idx]))/L
+            val_R += (np.abs(x_R[:, start_idx + L]) - np.abs(x_R[:, start_idx])) / L
             start_idx += 1
-            #val_R = np.mean(x_R_abs[:, start_idx : start_idx + L], axis=1)
+            # val_R = np.mean(x_R_abs[:, start_idx : start_idx + L], axis=1)
 
         end_idx: int = x_T.shape[1] - 1
         val_R = np.mean(np.abs(x_R[:, end_idx - L : end_idx]), axis=1)
         while np.amax(val_R) < Athr_over_L:
-            val_R += (np.abs(x_R[:,end_idx-L]) - np.abs(x_R[:,end_idx]))/L
+            val_R += (np.abs(x_R[:, end_idx - L]) - np.abs(x_R[:, end_idx])) / L
             end_idx -= 1
-            #val_R = np.mean(x_R_abs[:, end_idx - L : end_idx], axis=1)
+            # val_R = np.mean(x_R_abs[:, end_idx - L : end_idx], axis=1)
 
         startFrame_idx, endFrame_idx = (
             start_idx // self.hopSize,
             end_idx // self.hopSize,
         )
-        #endFrame_idx += 1
+        # endFrame_idx += 1
         return startFrame_idx, endFrame_idx
 
     def compute_modulationChanges(
@@ -68,12 +68,14 @@ class Mixin:
         L = 4
         Mdiff1bTilde_sqrt = np.sqrt(Mdiff1bTilde)
         intermediate_term = np.zeros((numChannels, N - L + 1))
-        for n in range(L, N+1):
-            intermediate_term[:, n-L] = np.sum(Mdiff1bTilde_sqrt[:, n-L : n], axis=1)
-        
-        intermediate_term = np.power(intermediate_term/L, 4)
+        for n in range(L, N + 1):
+            intermediate_term[:, n - L] = np.sum(
+                Mdiff1bTilde_sqrt[:, n - L : n], axis=1
+            )
 
-        MWdiff1B = np.sqrt(np.sum(intermediate_term, axis=1)/ (N - L + 1))
+        intermediate_term = np.power(intermediate_term / L, 4)
+
+        MWdiff1B = np.sqrt(np.sum(intermediate_term, axis=1) / (N - L + 1))
         # Mean across stereo channels
         MWdiff1B = np.mean(MWdiff1B)
 
@@ -234,10 +236,10 @@ class Mixin:
         # Finding KR and KT
         start_idx = np.ones((numChannels, numFrames), dtype=np.int32) * higherFreq_idx
         KR = self.bandwidthSearch(
-            X_dB=X_R_dB, threshold_dB=thresholdLevel, gap_dB=10, start_idx=start_idx-1
+            X_dB=X_R_dB, threshold_dB=thresholdLevel, gap_dB=10, start_idx=start_idx - 1
         )
         KT = self.bandwidthSearch(
-            X_dB=X_T_dB, threshold_dB=thresholdLevel, gap_dB=5, start_idx=KR-1
+            X_dB=X_T_dB, threshold_dB=thresholdLevel, gap_dB=5, start_idx=KR - 1
         )
         # computing the means
         weigths_R = np.where(KR >= 346, 1, 0)
@@ -285,7 +287,7 @@ class Mixin:
                 ):
                     bin_idx -= 1
 
-                bandwidth_idx[chan_idx, frame_idx] = bin_idx+1
+                bandwidth_idx[chan_idx, frame_idx] = bin_idx + 1
 
         return bandwidth_idx
 
@@ -396,12 +398,12 @@ class Mixin:
 
     @staticmethod
     def dot(Di, Dl):
-        return np.sum(Di*Dl, axis=1)
-    
+        return np.sum(Di * Dl, axis=1)
+
     @staticmethod
     def squaredNorm(Di):
         return np.sum(np.abs(np.square(Di)), axis=1)
-    
+
     def errorHarmonicStructure(self, X_T, X_R, x_T, x_R):
         numChannels, numBands, numFrames = X_T.shape
         # Difference weighted log spectra, Eq. (133)
@@ -420,10 +422,13 @@ class Mixin:
         D0norm = self.squaredNorm(D0)
         for l in range(0, Lmax):
             Dl = D[:, l : l + M, :]
-            if l==0:
+            if l == 0:
                 Dlnorm = D0norm
             else:
-                Dlnorm = Dlnorm+np.square(D[:,l+M-1,:])-np.square(D[:,l-1,:])
+                Dlnorm = (
+                    Dlnorm + np.square(D[:, l + M - 1, :]) - np.square(D[:, l - 1, :])
+                )
+
             res = self.dot(D0, Dl)
             res /= np.sqrt(D0norm * Dlnorm)
             C[:, l, :] = res
@@ -442,7 +447,7 @@ class Mixin:
         for channel_idx in range(numChannels):
             for frame_idx in range(numFrames):
                 val_prev = S[channel_idx, 0, frame_idx]
-                
+
                 for n in range(1, NL // 2):
                     val = S[channel_idx, n, frame_idx]
                     if val > val_prev:

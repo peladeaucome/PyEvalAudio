@@ -13,7 +13,8 @@ class PEAQ(
     """The advanced-mode is not used for now."""
 
     def __init__(self, mode="basic", Amax=32768, verbose=True):
-
+        
+        self.verbose=verbose
         if verbose:
             print('Init start')
         time_to_freq.Mixin.__init__(self, mode=mode, Amax=Amax)
@@ -218,7 +219,9 @@ class PEAQ(
             Ntot_R,
         )
 
-        self.print_movs(MOVs_vect)
+        if self.verbose:
+            self.print_movs(MOVs_vect)
+        
         ODG = self.ODG(MOVs_vect=MOVs_vect)
         return ODG
 
