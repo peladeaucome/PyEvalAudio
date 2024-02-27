@@ -39,18 +39,16 @@ class Mixin:
     def frequencySmoothing(self, R: npt.ArrayLike):
         numChannels, numBands, numFrames = R.shape
 
-        
         Ra = np.zeros_like(R)
 
         for k in range(numBands):
-            # Eq. (64)
+            # Eq. (63)
             M1 = min(self.FFTM1, k)
             M2 = min(self.FFTM2, self.numBarkBands - 1 - k)
-
             # Frequency smoothed terms, Eq. (62)
-            for i in range(k - M1, k + M2 + 1):
-                Ra[:, k, :] += R[:, i, :]
-            Ra[:, k, :] /= M1 + M2 + 1
+            Ra[:, k, :] = np.sum(R[:, k - M1 : k + M2 + 1, :], axis=1) / (M1 + M2 + 1)
+            # for i in range(k - M1, k + M2 + 1):
+            #     Ra[:, k, :] += R[:, i, :]
 
         return Ra
 
@@ -63,24 +61,16 @@ class Mixin:
 
         # Time spreading, Eq. (56)
         P_R = self.AR_filter(X=EsTilde_R, alpha=self.patternProcessingAlpha)
-
         P_T = self.AR_filter(X=EsTilde_T, alpha=self.patternProcessingAlpha)
 
         # Momentary correction factor, Eq. (57)
-        C_L = np.sum(np.sqrt(P_T * P_R), axis=1)
-        C_L = C_L / np.sum(P_T, axis=1)
-        C_L = np.square(C_L).reshape(
-            numChannels, 1, numFrames
-        )
+        C_L = np.sum(np.sqrt(P_T * P_R), axis=1, keepdims=True)
+        C_L /= np.sum(P_T, axis=1, keepdims=True)
+        C_L = np.square(C_L)
 
         # Correcting the excitation patterns, Eq. (58)
-        idx = np.where(C_L <= 1)
-        # E_{LR}, E_{LT}
-        EL_R = EsTilde_R
-        EL_R[idx] = EsTilde_R[idx] / C_L[idx]
-
-        EL_T = EsTilde_T * C_L
-        EL_T[idx] = EsTilde_T[idx]
+        EL_R = np.where(C_L > 1, EsTilde_R / C_L, EsTilde_R)
+        EL_T = np.where(C_L > 1, EsTilde_T, EsTilde_T * C_L)
 
         # Time smoothed correlation, Eq. (59)
         Rn = self.AR_filter(
@@ -103,7 +93,6 @@ class Mixin:
         # Pattern correction factors, Eq. (61)
         PC_R = self.AR_filter(X=Ra_R, alpha=self.patternProcessingAlpha)
         PC_T = self.AR_filter(X=Ra_T, alpha=self.patternProcessingAlpha)
-
 
         # Spectrally adapted patterns, Eq. (64)
         EP_T = EL_T * PC_T
@@ -156,22 +145,18 @@ class Mixin:
         c: float = 1.07664
         E0: float = 1e4
 
-        #Specific loudness patterns, Eq. (68)
+        # Specific loudness patterns, Eq. (68)
         commonFactor = c * np.power(self.Et / (self.s * E0), 0.23).reshape(
             1, self.numBarkBands, 1
         )
 
         N_T = np.power(1 - self.s + self.s * EsTilde_T / self.Et, 0.23) - 1
-        N_T = N_T * commonFactor
+        N_T *= commonFactor
 
         N_R = np.power(1 - self.s + self.s * EsTilde_R / self.Et, 0.23) - 1
-        N_R = N_R * commonFactor
+        N_R *= commonFactor
 
         # Total loudness, Eq. (71)
-        Ntot_T: npt.ArrayLike = (
-            np.mean(np.maximum(N_T, 0), axis=1) * 24
-        )
-        Ntot_R: npt.ArrayLike = (
-            np.mean(np.maximum(N_R, 0), axis=1) * 24
-        )
+        Ntot_T: npt.ArrayLike = np.mean(np.maximum(N_T, 0), axis=1) * 24
+        Ntot_R: npt.ArrayLike = np.mean(np.maximum(N_R, 0), axis=1) * 24
         return Ntot_T, Ntot_R

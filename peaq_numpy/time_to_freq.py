@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.typing as npt
-
+from . import critical_bands
 
 class Mixin:
     def __init__(self, mode="basic", Amax=32768):
@@ -169,18 +169,24 @@ class Mixin:
         """
         Returns the lower, higher and center frequencies of all Bark bands.
         """
-        band_idx = np.arange(self.numBarkBands)
+        # band_idx = np.arange(self.numBarkBands)
 
-        z_L = self.hzToBark(lowerBound_hz)
-        z_U = self.hzToBark(upperBound_hz)
+        # z_L = self.hzToBark(lowerBound_hz)
+        # z_U = self.hzToBark(upperBound_hz)
 
-        z_l = z_L + band_idx * self.barkWidth
-        z_u = np.minimum(z_l + self.barkWidth, z_U)
-        z_c = (z_u + z_l) / 2
+        # z_l = z_L + band_idx * self.barkWidth
+        # z_u = np.minimum(z_l + self.barkWidth, z_U)
+        # z_c = (z_u + z_l) / 2
 
-        f_l = self.barkToHz(z_l).reshape(self.numBarkBands, 1)
-        f_u = self.barkToHz(z_u).reshape(self.numBarkBands, 1)
-        f_c = self.barkToHz(z_c).reshape(self.numBarkBands, 1)
+        # f_l = self.barkToHz(z_l).reshape(self.numBarkBands, 1)
+        # f_u = self.barkToHz(z_u).reshape(self.numBarkBands, 1)
+        # f_c = self.barkToHz(z_c).reshape(self.numBarkBands, 1)
+
+        f_l = critical_bands.f_l.reshape(self.numBarkBands, 1)
+        
+        f_c = critical_bands.f_c.reshape(self.numBarkBands, 1)
+        
+        f_u = critical_bands.f_u.reshape(self.numBarkBands, 1)
 
         return f_l, f_c, f_u
 
@@ -293,11 +299,11 @@ class Mixin:
 
         return Es
 
-    def AR_filter(self, X, alpha):
+    def AR_filter(self, X, alpha, initial=0):
         numChannels, numBands, numFrames = X.shape
 
         out = np.zeros_like(X)
-        out_prev = np.zeros((numChannels, numBands))
+        out_prev = np.ones((numChannels, numBands))*initial
 
         alpha = alpha.reshape(1, numBands)
         for t in range(numFrames):

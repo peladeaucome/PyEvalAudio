@@ -50,13 +50,13 @@ class Mixin:
     def compute_modulationChanges(
         self, M_T, M_R, Ebar_R
     ) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
-        numChannels, _, N = M_T.shape
 
         # Delayed averaging
         M_T = M_T.copy()[:, :, self.Ndel :]
         M_R = M_R.copy()[:, :, self.Ndel :]
         Ebar_R = Ebar_R.copy()[:, :, self.Ndel :]
 
+        numChannels, _, N = M_T.shape
         ## WinModDiff1B
         # Instantaneous modulation difference, Eq. (73)
         Mdiff1B = np.abs(M_T - M_R) / (1 + M_R)
@@ -68,11 +68,12 @@ class Mixin:
         L = 4
         Mdiff1bTilde_sqrt = np.sqrt(Mdiff1bTilde)
         intermediate_term = np.zeros((numChannels, N - L + 1))
-        for n in range(N - L + 1):
-            intermediate_term[:, n] = np.sum(Mdiff1bTilde_sqrt[:, n : n + L], axis=1)
-        intermediate_term = np.power(intermediate_term / L, 4)
+        for n in range(L, N+1):
+            intermediate_term[:, n-L] = np.sum(Mdiff1bTilde_sqrt[:, n-L : n], axis=1)
+        
+        intermediate_term = np.power(intermediate_term/L, 4)
 
-        MWdiff1B = np.sqrt(np.mean(intermediate_term, axis=1))
+        MWdiff1B = np.sqrt(np.sum(intermediate_term, axis=1)/ (N - L + 1))
         # Mean across stereo channels
         MWdiff1B = np.mean(MWdiff1B)
 
