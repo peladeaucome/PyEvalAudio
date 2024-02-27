@@ -444,15 +444,18 @@ class Mixin:
 
         EH_max = np.zeros((numChannels, numFrames))
 
-        for channel_idx in range(numChannels):
-            for frame_idx in range(numFrames):
-                val_prev = S[channel_idx, 0, frame_idx]
+        # This computation matches the Matlab code but not the report
+        EH_max = np.amax(S, axis=1)
+        EH_max = np.where(EH_max > S[:, 0, :], EH_max, 0)
+        # for channel_idx in range(numChannels):
+        #     for frame_idx in range(numFrames):
+        #         val_prev = S[channel_idx, 0, frame_idx]
 
-                for n in range(1, NL // 2):
-                    val = S[channel_idx, n, frame_idx]
-                    if val > val_prev:
-                        if val > EH_max[channel_idx, frame_idx]:
-                            EH_max[channel_idx, frame_idx] = val
+        #         for n in range(1, NL // 2):
+        #             val = S[channel_idx, n, frame_idx]
+        #             if val > val_prev:
+        #                 if val > EH_max[channel_idx, frame_idx]:
+        #                     EH_max[channel_idx, frame_idx] = val
 
         ## Error Harmonic structure with energy threshold
 
