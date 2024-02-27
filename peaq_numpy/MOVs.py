@@ -417,10 +417,15 @@ class Mixin:
         C = np.zeros((numChannels, Lmax, numFrames))
 
         D0 = D[:, 0:M, :]
+        D0norm = self.squaredNorm(D0)
         for l in range(0, Lmax):
-            Dl = D[:, l + 1 : l + 1 + M, :]
+            Dl = D[:, l : l + M, :]
+            if l==0:
+                Dlnorm = D0norm
+            else:
+                Dlnorm = Dlnorm+np.square(D[:,l+M-1,:])-np.square(D[:,l-1,:])
             res = self.dot(D0, Dl)
-            res /= np.sqrt(self.squaredNorm(D0) * self.squaredNorm(Dl))
+            res /= np.sqrt(D0norm * Dlnorm)
             C[:, l, :] = res
 
         # Windowed correlation, Eqs. (140), (141), (142)
