@@ -161,7 +161,6 @@ class PEAQ(
         EP_T, EP_R, M_T, M_R, Ebar_R, Ntot_T, Ntot_R = patt
 
         startFrame_idx, endFrame_idx = self.get_dataBoundary(x_T=x_T, x_R=x_R)
-
         (
             X_T,
             X_R,
@@ -196,6 +195,7 @@ class PEAQ(
             end_idx=endFrame_idx,
         )
 
+    
         x_T = x_T[:,startFrame_idx*self.hopSize:endFrame_idx*self.hopSize+self.NF]
         x_R = x_R[:,startFrame_idx*self.hopSize:endFrame_idx*self.hopSize+self.NF]
 

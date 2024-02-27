@@ -3,7 +3,7 @@ import numpy.typing as npt
 
 
 class Mixin:
-    def __init__(self, mode='basic', Amax=32768):
+    def __init__(self, mode="basic", Amax=32768):
 
         self.NF = 2048  # Window size
         self.hopSize = 1024  # Frame advance
@@ -62,8 +62,6 @@ class Mixin:
         self.timeToFreqAlpha: npt.ArrayLike = np.exp(
             -1 / (self.Fss_fft * timeConstants)
         )
-
-        
 
     def get_hannWindow(self, NF: int = 1025) -> npt.ArrayLike:
         """
@@ -192,7 +190,6 @@ class Mixin:
 
         f_u = self.f_u.reshape(1, 1, self.numBarkBands, 1)
         f_l = self.f_l.reshape(1, 1, self.numBarkBands, 1)
-        U = np.zeros((1, self.numBarkBands, self.numFftBands, 1))
 
         k = np.arange(self.numFftBands).reshape(1, self.numFftBands, 1, 1)
         i = np.arange(self.numBarkBands).reshape(1, 1, self.numBarkBands, 1)
@@ -218,10 +215,10 @@ class Mixin:
         numChannels = E.shape[0]
         num_frames = E.shape[2]
 
-        i = np.arange(self.numBarkBands, dtype="int32").reshape(
+        i = np.arange(self.numBarkBands, dtype=np.int32).reshape(
             1, self.numBarkBands, 1, 1
         )
-        l = np.arange(self.numBarkBands, dtype="int32").reshape(
+        l = np.arange(self.numBarkBands, dtype=np.int32).reshape(
             1, 1, self.numBarkBands, 1
         )
 
@@ -232,27 +229,68 @@ class Mixin:
         f_c_rs = self.f_c.reshape(1, 1, self.numBarkBands, 1)
         E = E.reshape(numChannels, 1, self.numBarkBands, num_frames)
 
-        S_dB = np.zeros((numChannels, self.numBarkBands, self.numBarkBands, num_frames))
-
-        S_dB = -24 - 230 / f_c_rs + 2 * np.log10(E) * np.ones_like(S_dB)
-        S_dB = S_dB * i_l * self.barkWidth
-
-        idx: npt.ArrayLike = np.asarray(i_l <= 0) * np.ones_like(S_dB)
-        idx = idx.nonzero()
-        S_dB[idx] = (
-            (27 * i_l * self.barkWidth)
-            * np.ones((numChannels, self.numBarkBands, self.numBarkBands, num_frames))
-        )[idx]
+        S_dB = np.where(
+            i_l <= 0,
+            27,
+            ((-24 - 230 / f_c_rs) + 2 * np.log10(E)),
+        ) * (i_l * self.barkWidth)
 
         S = self.idB10(S_dB)
 
-        A = np.sum(S, axis=1).reshape(numChannels, 1, self.numBarkBands, num_frames)
+        A = np.sum(S, axis=1, keepdims=True)
         S = S / A
 
-        Es = np.power(S * E.reshape(numChannels, 1, self.numBarkBands, num_frames), 0.4)
+        Es = np.power(S * E, 0.4)
 
         Es = np.sum(Es, axis=2)
         Es = np.power(Es, 2.5) / self.B_s
+
+        return Es
+
+    def frequencySpreading_efficient(self, E):
+        numChannels = E.shape[0]
+        num_frames = E.shape[2]
+
+        i = np.arange(self.numBarkBands, dtype=np.int32).reshape(
+            1, self.numBarkBands, 1, 1
+        )
+        l = np.arange(self.numBarkBands, dtype=np.int32).reshape(
+            1, 1, self.numBarkBands, 1
+        )
+
+        # Indices array
+        i_l = i - l
+
+        # Reshaping previous arrays
+        f_c_rs = self.f_c.reshape(1, 1, self.numBarkBands, 1)
+        E = E.reshape(numChannels, 1, self.numBarkBands, num_frames)
+
+        a_L = np.power(10, 2.7 * self.barkWidth)
+
+        a_U = np.power(10, -2.4 * self.barkWidth)
+
+        a_C = np.power(10, -23 * self.barkWidth / f_c_rs)
+
+        a_E = np.power(E, 0.2 * self.barkWidth)
+
+        S = np.where(i_l <= 0, a_L, a_U * a_C * a_E)
+        S = np.power(S, i_l)
+
+        # temp = a_U * a_C * a_E
+        # A = (
+        #     (1 - np.power(a_L, -(l + 1))) / (1 - 1 / a_L)
+        #     + (1 - np.power(temp, self.numBarkBands - l)) / (1 - temp)
+        #     - 1
+        # )
+
+        A = np.sum(S, axis=1, keepdims=True)
+        S = S / A
+
+        Es = np.power(S * E, 0.4)
+
+        Es = np.sum(Es, axis=2)
+        Es = np.power(Es, 2.5) / self.B_s
+
         return Es
 
     def AR_filter(self, X, alpha):
@@ -305,16 +343,39 @@ class Mixin:
         Xw2 = Xw2.reshape(numChannels, self.numFftBands, 1, numFrames)
         Ea = Xw2 * self.U
         Ea = np.sum(Ea, axis=1)
-        Emin = 1e-12 * np.ones_like(Ea)
+        Emin = 1e-12
+        Eb = np.maximum(Ea, Emin)
+        return Eb
+
+    def apply_frequencyGrouping_efficient(self, Xw2):
+        numChannels, _, numFrames = Xw2.shape
+        Ea = np.zeros((numChannels, self.numBarkBands, numFrames))
+
+        k_l = 0
+
+        for barkBand_idx in range(self.numBarkBands):
+            while self.U[0, k_l, barkBand_idx, 0] == 0.0:
+                k_l += 1
+            k_u = k_l
+            while self.U[0, k_u, barkBand_idx, 0] > 0.0:
+                k_u += 1
+            temp = np.sum(
+                self.U[:, k_l:k_u, barkBand_idx, :] * Xw2[:, k_l:k_u, :],
+                axis=1,
+            )
+            Ea[:, barkBand_idx, :] = temp
+
+        Emin = 1e-12
+
         Eb = np.maximum(Ea, Emin)
         return Eb
 
     def apply_stftToPatterns(self, Xw2):
-        Eb = self.apply_frequencyGrouping(Xw2)
+        Eb = self.apply_frequencyGrouping_efficient(Xw2)
 
         E = self.apply_internalNoise(Eb)
 
-        Es = self.frequencySpreading(E)
+        Es = self.frequencySpreading_efficient(E)
 
         EsTilde = self.timeDomainSpreading(Es)
         return Es, EsTilde
@@ -326,5 +387,5 @@ class Mixin:
 
     def compute_noisePatterns(self, Xw2_T, Xw2_R):
         Xw2N_squared = Xw2_T - 2 * np.sqrt(Xw2_T * Xw2_R) + Xw2_R
-        EbN = self.apply_frequencyGrouping(Xw2N_squared)
+        EbN = self.apply_frequencyGrouping_efficient(Xw2N_squared)
         return EbN

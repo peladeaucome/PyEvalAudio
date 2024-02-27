@@ -16,37 +16,35 @@ class Mixin:
         self.gm = 1 / (self.idB10(m_dB))
 
     def get_dataBoundary(self, x_T, x_R) -> tuple[int, int]:
-        """Finds and returns the data boundaries in sample index"""
-        Athr = 200 * self.Amax / 32768
+        """Finds and returns the data boundaries in frame index"""
+        Athr = 200 * (self.Amax / 32768)
 
         x_R_abs = np.abs(x_R)
-        x_T_abs = np.abs(x_T)
 
         L = 5  # Number of samples in a window
         Athr_over_L = Athr / L
+        #Athr_over_L=Athr
 
         start_idx: int = 0
-        val_R = np.mean(x_R_abs[:, start_idx : start_idx + L])
-        val_T = np.mean(x_T_abs[:, start_idx : start_idx + L])
+        val_R = np.mean(np.abs(x_R[:, start_idx : start_idx + L]), axis=1)
         # Finding the starting point
-        while max(val_R, val_T) < Athr_over_L:
+        while np.amax(val_R) < Athr_over_L:
+            val_R += (np.abs(x_R[:,start_idx+L]) - np.abs(x_R[:,start_idx]))/L
             start_idx += 1
-            val_R = np.mean(x_R_abs[:, start_idx : start_idx + L])
-            val_T = np.mean(x_T_abs[:, start_idx : start_idx + L])
+            #val_R = np.mean(x_R_abs[:, start_idx : start_idx + L], axis=1)
 
         end_idx: int = x_T.shape[1] - 1
-        val_R = np.mean(x_R_abs[:, end_idx - L : end_idx])
-        val_T = np.mean(x_T_abs[:, end_idx - L : end_idx])
-        while max(val_R, val_T) < Athr_over_L:
+        val_R = np.mean(np.abs(x_R[:, end_idx - L : end_idx]), axis=1)
+        while np.amax(val_R) < Athr_over_L:
+            val_R += (np.abs(x_R[:,end_idx-L]) - np.abs(x_R[:,end_idx]))/L
             end_idx -= 1
-            val_R = np.mean(x_R_abs[:, end_idx - L : end_idx])
-            val_T = np.mean(x_T_abs[:, end_idx - L : end_idx])
+            #val_R = np.mean(x_R_abs[:, end_idx - L : end_idx], axis=1)
 
         startFrame_idx, endFrame_idx = (
             start_idx // self.hopSize,
             end_idx // self.hopSize,
         )
-        endFrame_idx += 1
+        #endFrame_idx += 1
         return startFrame_idx, endFrame_idx
 
     def compute_modulationChanges(
@@ -235,17 +233,17 @@ class Mixin:
         # Finding KR and KT
         start_idx = np.ones((numChannels, numFrames), dtype=np.int32) * higherFreq_idx
         KR = self.bandwidthSearch(
-            X_dB=X_R_dB, threshold_dB=thresholdLevel, gap_dB=10, start_idx=start_idx
+            X_dB=X_R_dB, threshold_dB=thresholdLevel, gap_dB=10, start_idx=start_idx-1
         )
         KT = self.bandwidthSearch(
-            X_dB=X_T_dB, threshold_dB=thresholdLevel, gap_dB=5, start_idx=KR
+            X_dB=X_T_dB, threshold_dB=thresholdLevel, gap_dB=5, start_idx=KR-1
         )
         # computing the means
-        weigths_R = np.where(KR > 346, 1, 0)
+        weigths_R = np.where(KR >= 346, 1, 0)
         W_R = np.sum(KR * weigths_R, axis=1) / np.sum(weigths_R, axis=1)
 
-        weigths_T = np.where(KT > 346, 1, 0) * weigths_R
-        W_T = np.sum(KT * weigths_T, axis=1) / np.sum(weigths_T, axis=1)
+        weigths_T = np.where(KT >= 346, 1, 0) * weigths_R
+        W_T = np.sum(KT * weigths_R, axis=1) / np.sum(weigths_R, axis=1)
 
         ## Mean across channels
         W_R = np.mean(W_R)
@@ -286,7 +284,7 @@ class Mixin:
                 ):
                     bin_idx -= 1
 
-                bandwidth_idx[chan_idx, frame_idx] = bin_idx
+                bandwidth_idx[chan_idx, frame_idx] = bin_idx+1
 
         return bandwidth_idx
 
@@ -435,8 +433,6 @@ class Mixin:
 
         EH_max = np.zeros((numChannels, numFrames))
 
-        print(S.shape)
-        print(NL//2)
         for channel_idx in range(numChannels):
             for frame_idx in range(numFrames):
                 val_prev = S[channel_idx, 0, frame_idx]
@@ -444,7 +440,6 @@ class Mixin:
                 for n in range(1, NL // 2):
                     val = S[channel_idx, n, frame_idx]
                     if val > val_prev:
-                        print('haha')
                         if val > EH_max[channel_idx, frame_idx]:
                             EH_max[channel_idx, frame_idx] = val
 
@@ -453,7 +448,6 @@ class Mixin:
         threshold_idx = self.find_energyThreshold(x_T=x_T, x_R=x_R, X_T=X_T)
 
         EHB = 1000 * np.sum(EH_max * threshold_idx, axis=1) / np.sum(threshold_idx)
-        print(np.where(threshold_idx < 0.5))
 
         # Mean across channels
         EHB = np.mean(EHB)
