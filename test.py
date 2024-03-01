@@ -59,7 +59,7 @@ def get_refAndCod(all_names):
 ref_names, cod_names = get_refAndCod(All_names)
 
 
-obj_idx = 9
+obj_idx = 0
 
 
 Fref = os.path.normpath(f"Data/CONFORMANCE TEST ITEMS/{ref_names[obj_idx]}")

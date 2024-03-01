@@ -19,8 +19,7 @@ class Mixin:
         `x_dB`: array-like, same size as `x`
             sample_wise decibel values of x.
         """
-        x_abs = np.maximum(np.abs(x), eps)
-        return 20*np.log10(x_abs)
+        return 20*np.log10(np.abs(x))
 
     def dB10(self, x:npt.ArrayLike, eps:float=1e-12) -> npt.ArrayLike:
         """
@@ -38,8 +37,7 @@ class Mixin:
         `x_dB`: array-like, same size as `x`
             sample_wise decibel values of x.
         """
-        x_abs = np.maximum(np.abs(x), eps)
-        return 10*np.log10(x_abs)
+        return 10*np.log10(np.abs(x))
 
     def idB20(self, x_dB:npt.ArrayLike) -> npt.ArrayLike:
         """

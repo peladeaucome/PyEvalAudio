@@ -42,7 +42,7 @@ class Mixin:
 
         startFrame_idx, endFrame_idx = (
             start_idx // self.hopSize,
-            end_idx // self.hopSize-1,
+            end_idx // self.hopSize - 1,
         )
         # endFrame_idx += 1
         return startFrame_idx, endFrame_idx
@@ -227,7 +227,7 @@ class Mixin:
         # Finding the threshold
         higherFreq_hz = 21586
         higherFreq_idx = int(self.NF * higherFreq_hz / self.sr_hz)
-        thresholdLevel = np.amax(X_T_dB[:, higherFreq_idx:, :], axis=1)
+        thresholdLevel = np.amax(X_T_dB[:, higherFreq_idx:-1, :], axis=1)
 
         # Finding KR and KT
         start_idx = np.ones((numChannels, numFrames), dtype=np.int32) * higherFreq_idx
@@ -238,11 +238,10 @@ class Mixin:
             X_dB=X_T_dB, threshold_dB=thresholdLevel, gap_dB=5, start_idx=KR - 1
         )
         # computing the means
-        # weigths_R = np.where(KR > 346, 1, 0)
-        weigths = np.where(KR >= 346, 1.0, 0.0)
-        W_R = np.sum(KR * weigths, axis=1) / np.sum(weigths, axis=1)
-
-        W_T = np.sum(KT * weigths, axis=1) / np.sum(weigths, axis=1)
+        weights = np.where(KR > 346, 1.0, 0.0)
+        W_R = np.sum(KR * weights, axis=1) / np.sum(weights, axis=1)
+        weights = np.where(KT > 0, 1.0, 0.0)*weights
+        W_T = np.sum(KT * weights, axis=1) / np.sum(weights, axis=1)
 
         ## Mean across channels
         W_R = np.mean(W_R)
@@ -284,9 +283,9 @@ class Mixin:
                     bin_idx -= 1
                 if bin_idx == 0:
                     bin_idx = -1
-                bandwidth_idx[chan_idx, frame_idx] = bin_idx + 1
+                bandwidth_idx[chan_idx, frame_idx] = bin_idx
 
-        return bandwidth_idx
+        return bandwidth_idx + 1
 
     def get_maskThreshold(self):
         m_dB = 3 * np.ones((self.numBarkBands))
@@ -422,8 +421,10 @@ class Mixin:
         D = np.zeros((numChannels, L, numFrames))
 
         for frame_idx in range(numFrames):
-            if threshold_idx[:,frame_idx]>0:
-                D[:,:,frame_idx]= 2 * np.log(X_T[:, :L, frame_idx] / X_R[:, :L, frame_idx])
+            if threshold_idx[:, frame_idx] > 0:
+                D[:, :, frame_idx] = 2 * np.log(
+                    X_T[:, :L, frame_idx] / X_R[:, :L, frame_idx]
+                )
 
         # Normalized autocorrelation, Eq. (135)
         d0 = np.fft.rfft(D[:, :M, :], n=L, axis=1)
