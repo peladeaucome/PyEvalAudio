@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.typing as npt
-
+import numba
 
 class Mixin:
     def __init__(self):
@@ -88,7 +88,7 @@ class Mixin:
 
         # Distortion index, Eq. (149)
         DI = self.neuralNet(MOVs_vect_norm)
-
+        print(f'DI: {DI}')
         #Objective grade difference, Eq. (151)
         bmin = -3.98
         bmax = 0.22

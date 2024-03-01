@@ -162,6 +162,9 @@ class PEAQ(
         EP_T, EP_R, M_T, M_R, Ebar_R, Ntot_T, Ntot_R = patt
 
         startFrame_idx, endFrame_idx = self.get_dataBoundary(x_T=x_T, x_R=x_R)
+
+        #endFrame_idx=613
+
         (
             X_T,
             X_R,
@@ -194,6 +197,10 @@ class PEAQ(
             Ntot_R,
             start_idx=startFrame_idx,
             end_idx=endFrame_idx,
+        )
+
+        print(
+            f'Fstart: {startFrame_idx}, Fend: {endFrame_idx}'
         )
 
     
@@ -252,7 +259,7 @@ class Data:
 def crop_multiple(*X_list, start_idx, end_idx):
     out = []
     for X in X_list:
-        out.append(X[..., start_idx:end_idx])
+        out.append(X[..., start_idx:end_idx+1])
     return tuple(out)
 
 
