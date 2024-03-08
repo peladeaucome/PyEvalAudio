@@ -1,7 +1,10 @@
 import numpy as np
 import numpy.typing as npt
 from . import critical_bands
-from numba import njit
+import matplotlib.pyplot as plt
+
+# from numba import njit
+
 
 class Mixin:
     def __init__(self, mode="basic", Amax=32768):
@@ -29,12 +32,20 @@ class Mixin:
         self.numFftBands: int = 1025
         self.f_hz: npt.ArrayLike = np.fft.rfftfreq(n=2048, d=1 / self.sr_hz)
 
-        # Hann window
-        self.window = npt.ArrayLike = self.get_hannWindow(NF=self.NF)
-
         # loudness scaling
-        self.G_L: float = 3.504
-        # self.G_L:float =91.55
+        self.G_L: float = 3.503992537617512
+        # gamma = 0.8497
+        # Lp = 92
+        # self.G_L = 1000
+        # self.G_L = (
+        #     self.idB20(Lp)
+        #     / (gamma * (self.Amax / 4) * (self.NF - 1))
+        #     * np.sqrt(3 / 8)
+        #     * self.NF
+        # )
+
+        # Hann window
+        self.window: npt.ArrayLike = self.get_hannWindow(NF=self.NF)
 
         # FFT weighting filter
         self.W: npt.ArrayLike = self.get_earFilter()
@@ -83,7 +94,7 @@ class Mixin:
         h = (
             1 - np.cos((2 * np.pi * n) / (NF - 1))
         ) * 0.5  # Hann window of maximum value 1
-        h = np.sqrt(8 / 3) * h  # Scaling the output
+        h *= np.sqrt(8 / 3)  # Scaling the output
         return h
 
     def apply_STFT(self, x: npt.ArrayLike) -> npt.ArrayLike:
@@ -92,20 +103,26 @@ class Mixin:
         numChannels, numSamples = x.shape
 
         # Number of frames
-        T = (numSamples - (self.NF - self.hopSize)) // self.hopSize
+        numFrames = (numSamples - (self.NF - self.hopSize)) // self.hopSize
 
         F = 1025
 
         # Initializing the output array
-        X = np.zeros((numChannels, F, T))
+        X = np.zeros((numChannels, F, numFrames), dtype=np.float32)
 
-        for t in range(T):
-            for channel in range(numChannels):
-                x_w = x[channel, t * self.hopSize : t * self.hopSize + self.NF]
-                x_w = x_w * self.window
-                X[channel, :, t] = np.abs(np.fft.rfft(x_w))
+        w = np.reshape(self.window, (1, self.NF)) / self.NF
 
-        return X / self.NF
+        x_framed = np.zeros((numChannels, self.NF, numFrames))
+        start_idx = 0
+        for t in range(numFrames):
+            end_idx = min(start_idx + self.NF, numSamples)
+            x_framed[:, :, t] = x[:, start_idx:end_idx]
+            start_idx += self.hopSize
+
+        w = np.reshape(self.window, (1, self.NF, 1)) / self.NF
+        X = np.abs(np.fft.rfft(x_framed * w, axis=1))
+
+        return X
 
     def get_earFilter(self) -> npt.ArrayLike:
         """
@@ -184,9 +201,9 @@ class Mixin:
         # f_c = self.barkToHz(z_c).reshape(self.numBarkBands, 1)
 
         f_l = critical_bands.f_l.reshape(self.numBarkBands, 1)
-        
+
         f_c = critical_bands.f_c.reshape(self.numBarkBands, 1)
-        
+
         f_u = critical_bands.f_u.reshape(self.numBarkBands, 1)
 
         return f_l, f_c, f_u
@@ -209,24 +226,19 @@ class Mixin:
 
     def get_internalNoise(self, f) -> npt.ArrayLike:
         zeros = np.where(f < 1e-12)
-        other = np.where(f >= 1e-12)
+        # other = np.where(f >= 1e-12)
         Ein_dB = np.ones_like(f)
-        Ein_dB[other] = np.power(f[other] * 0.001, -0.8)
-        Ein_dB = Ein_dB * 1.456
-        # Ein_dB = 1.456*np.power(f*.001, -0.8)
+        # Ein_dB[other] = np.power(f[other] * 0.001, -0.8)
+        Ein_dB = 1.456 * np.power(f * 0.001, -0.8)
         Ein = self.idB10(Ein_dB)
-        Ein[zeros] = 0
+        # Ein[zeros] = 0
         return Ein
 
     def frequencySpreading(self, E):
         numChannels, numBarkBands, numFrames = E.shape
 
-        i = np.arange(numBarkBands, dtype=np.int32).reshape(
-            1, numBarkBands, 1, 1
-        )
-        l = np.arange(numBarkBands, dtype=np.int32).reshape(
-            1, 1, numBarkBands, 1
-        )
+        i = np.arange(numBarkBands, dtype=np.int32).reshape(1, numBarkBands, 1, 1)
+        l = np.arange(numBarkBands, dtype=np.int32).reshape(1, 1, numBarkBands, 1)
 
         # Indices array
         i_l = i - l
@@ -255,17 +267,16 @@ class Mixin:
         Es = np.power(Es, 2.5) / self.B_s
         return Es
 
+    def AR_filter(self, X, alpha):
+        return self.AR_filter_jit(X, alpha)
 
-    def AR_filter(self, X, alpha, initial=0):
-        return self.AR_filter_jit(X, alpha, initial)
-    
     # @njit
     @staticmethod
-    def AR_filter_jit(X, alpha, initial=0):
+    def AR_filter_jit(X, alpha):
         numChannels, numBands, numFrames = X.shape
 
         out = np.zeros_like(X)
-        out_prev = np.ones((numChannels, numBands))*initial
+        out_prev = np.zeros((numChannels, numBands))
 
         alpha = alpha.reshape(1, numBands)
         for t in range(numFrames):
@@ -290,7 +301,7 @@ class Mixin:
         """
         Scales the data so that it corresponds to a 16 bits encoded waveform
         """
-        return x / self.Amax * 32768
+        return x * 32768 / self.Amax
 
     def apply_earFilter(self, X):
         """
@@ -308,11 +319,11 @@ class Mixin:
     def apply_frequencyGrouping(self, Xw2):
         """Applies the frequency grouping to a squared magnitude weighted STFT"""
         return apply_frequencyGrouping_jit(Xw2, self.U)
-    
+
     def apply_frequencyGrouping_efficient(self, Xw2):
         numChannels, _, numFrames = Xw2.shape
         numBarkBands = self.U.shape[2]
-        
+
         Ea = np.zeros((numChannels, numBarkBands, numFrames))
 
         k_l = 0
@@ -332,7 +343,7 @@ class Mixin:
         Emin = 1e-12
         Eb = np.maximum(Ea, Emin)
         return Eb
-    
+
     def apply_stftToPatterns(self, Xw2):
         Eb = self.apply_frequencyGrouping_efficient(Xw2)
 
@@ -353,15 +364,12 @@ class Mixin:
         EbN = self.apply_frequencyGrouping_efficient(Xw2N_squared)
         return EbN
 
+
 def frequencySpreading_jit(E, barkwidth, f_c, B_s):
     numChannels, numBarkBands, numFrames = E.shape
 
-    i = np.arange(numBarkBands, dtype=np.int32).reshape(
-        1, numBarkBands, 1, 1
-    )
-    l = np.arange(numBarkBands, dtype=np.int32).reshape(
-        1, 1, numBarkBands, 1
-    )
+    i = np.arange(numBarkBands, dtype=np.int32).reshape(1, numBarkBands, 1, 1)
+    l = np.arange(numBarkBands, dtype=np.int32).reshape(1, 1, numBarkBands, 1)
 
     # Indices array
     i_l = i - l
@@ -390,11 +398,12 @@ def frequencySpreading_jit(E, barkwidth, f_c, B_s):
     Es = np.power(Es, 2.5) / B_s
     return Es
 
+
 # @njit
-def apply_frequencyGrouping_jit(Xw2:npt.ArrayLike, U:npt.ArrayLike) -> npt.ArrayLike:
+def apply_frequencyGrouping_jit(Xw2: npt.ArrayLike, U: npt.ArrayLike) -> npt.ArrayLike:
     numChannels, _, numFrames = Xw2.shape
     numBarkBands = U.shape[2]
-    
+
     Ea = np.zeros((numChannels, numBarkBands, numFrames))
 
     k_l = 0
@@ -413,4 +422,5 @@ def apply_frequencyGrouping_jit(Xw2:npt.ArrayLike, U:npt.ArrayLike) -> npt.Array
 
     Emin = 1e-12
     Eb = np.maximum(Ea, Emin)
+    print(np.where(Eb < 1e-12))
     return Eb

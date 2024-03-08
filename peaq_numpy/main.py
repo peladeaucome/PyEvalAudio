@@ -7,23 +7,25 @@ from . import pattern_processing
 from . import MOVs
 from . import ODG
 
+
 class PEAQ(
     utils.Mixin, time_to_freq.Mixin, pattern_processing.Mixin, MOVs.Mixin, ODG.Mixin
 ):
     """The advanced-mode is not used for now."""
 
-    def __init__(self, mode="basic", Amax=32768, verbose=True):
-        
-        self.verbose=verbose
+    def __init__(self, mode="basic", Amax=32768, verbose=True, output="odg"):
+
+        self.verbose = verbose
         if verbose:
-            print('Init start')
+            print("Init start")
+
         time_to_freq.Mixin.__init__(self, mode=mode, Amax=Amax)
         pattern_processing.Mixin.__init__(self)
         MOVs.Mixin.__init__(self)
-        ODG.Mixin.__init__(self)
+        ODG.Mixin.__init__(self, output=output)
 
         if verbose:
-            print('Init ended')
+            print("Init ended")
 
     def timeToFrequencyDomain(self, x_T, x_R):
         """
@@ -105,16 +107,17 @@ class PEAQ(
         Ebar_R,
         Ntot_T,
         Ntot_R,
+        startFrame_idx=0
     ):
 
-        MWdiff1B, MAdiff1B, MAdiff2B = self.compute_modulationChanges(
-            M_T=M_T, M_R=M_R, Ebar_R=Ebar_R
+        MWdiff1B, MAdiff1B, MAdiff2B, Ndel = self.compute_modulationChanges(
+            M_T=M_T, M_R=M_R, Ebar_R=Ebar_R,startFrame_idx =startFrame_idx
         )
 
         W_R, W_T = self.compute_bandwidth(X_T=X_T, X_R=X_R)
 
         NLrmsB = self.compute_RMSNoiseLoud(
-            EP_T=EP_T, EP_R=EP_R, M_R=M_R, M_T=M_T, Ntot_T=Ntot_T, Ntot_R=Ntot_R
+            EP_T=EP_T, EP_R=EP_R, M_R=M_R, M_T=M_T, Ntot_T=Ntot_T, Ntot_R=Ntot_R, Ndel=Ndel
         )
 
         RNMtot, RelDistFrames = self.masking(
@@ -160,10 +163,18 @@ class PEAQ(
 
         patt = self.patternProcessing(Es_T, Es_R)
         EP_T, EP_R, M_T, M_R, Ebar_R, Ntot_T, Ntot_R = patt
-
+        
         startFrame_idx, endFrame_idx = self.get_dataBoundary(x_T=x_T, x_R=x_R)
 
-        #endFrame_idx=613
+        startSample_idx = startFrame_idx * self.hopSize
+        endSample_idx = endFrame_idx*self.hopSize+self.NF
+
+        x_T = x_T[
+            :, startSample_idx : endSample_idx
+        ]
+        x_R = x_R[
+            :, startSample_idx  : endSample_idx
+        ]
 
         (
             X_T,
@@ -199,67 +210,63 @@ class PEAQ(
             end_idx=endFrame_idx,
         )
 
-        print(
-            f'Fstart: {startFrame_idx}, Fend: {endFrame_idx}'
-        )
+        if self.verbose:
+            print(f"Fstart: {startFrame_idx}, Fend: {endFrame_idx}")
 
-    
-        x_T = x_T[:,startFrame_idx*self.hopSize:endFrame_idx*self.hopSize+self.NF]
-        x_R = x_R[:,startFrame_idx*self.hopSize:endFrame_idx*self.hopSize+self.NF]
-
+        
         MOVs_vect = self.compute_allMOVs(
-            x_T,
-            x_R,
-            X_T,
-            X_R,
-            Es_T,
-            Es_R,
-            EsTilde_T,
-            EsTilde_R,
-            EbN,
-            EP_T,
-            EP_R,
-            M_T,
-            M_R,
-            Ebar_R,
-            Ntot_T,
-            Ntot_R,
+            x_T=x_T,
+            x_R=x_R,
+            X_T=X_T,
+            X_R=X_R,
+            Es_T=Es_T,
+            Es_R=Es_R,
+            EsTilde_T=EsTilde_T,
+            EsTilde_R=EsTilde_R,
+            EbN=EbN,
+            EP_T=EP_T,
+            EP_R=EP_R,
+            M_T=M_T,
+            M_R=M_R,
+            Ebar_R=Ebar_R,
+            Ntot_T=Ntot_T,
+            Ntot_R=Ntot_R,
+            startFrame_idx=startFrame_idx
         )
 
         if self.verbose:
             self.print_movs(MOVs_vect)
-        
+
         ODG = self.ODG(MOVs_vect=MOVs_vect)
         return ODG
 
     @staticmethod
     def print_movs(MOVs_vect):
         MOVs_names = [
-            'BandwidthRef ',
-            'BandwidthTest',
-            'Total NMR    ',
-            'WinModDiff1  ',
-            'ADB          ',
-            'EHS          ',
-            'AvgModDiff1  ',
-            'AvgModDiff2  ',
-            'RmsNoiseLoud ',
-            'MFPD         ',
-            'RelDistFrames']
-        
-        for idx in range(len(MOVs_vect)):
-            print(f'{MOVs_names[idx]}: {MOVs_vect[idx]}')
-        
+            "BandwidthRef ",
+            "BandwidthTest",
+            "Total NMR    ",
+            "WinModDiff1  ",
+            "ADB          ",
+            "EHS          ",
+            "AvgModDiff1  ",
+            "AvgModDiff2  ",
+            "RmsNoiseLoud ",
+            "MFPD         ",
+            "RelDistFrames",
+        ]
 
-class Data:
-    def __init__(self, x, Amax):
-        pass
+        for idx in range(len(MOVs_vect)):
+            print(f"{MOVs_names[idx]}: {MOVs_vect[idx]}")
+
+
 
 
 def crop_multiple(*X_list, start_idx, end_idx):
     out = []
+    
     for X in X_list:
-        out.append(X[..., start_idx:end_idx+1])
+        out.append(X[..., start_idx : end_idx+1])
     return tuple(out)
 
 
@@ -408,15 +415,27 @@ if __name__ == "__main__":
     print(
         f"Loudness difference:                               {round(np.mean(Ntot_R)-np.mean(Ntot_T), 3)} sones"
     )
-    
 
     f = 10000
     numSamples = peaq.hopSize * 250
     n = np.arange(numSamples)
     n = n.reshape(1, numSamples)
     amp = Amax * 100 / peaq.idB20(92)
-    x_R = np.sin(n * 2 * np.pi * f / peaq.sr_hz) * amp * (np.sin(n*2*np.pi*16/ peaq.sr_hz)+1)/2 + np.random.randn(numSamples)*amp/100 # ref signal
-    x_T = x_R + np.random.randn(numSamples)*amp/2*(np.sin(n*2*np.pi*3/ peaq.sr_hz)+1)/2 # test signal
+    x_R = (
+        np.sin(n * 2 * np.pi * f / peaq.sr_hz)
+        * amp
+        * (np.sin(n * 2 * np.pi * 16 / peaq.sr_hz) + 1)
+        / 2
+        + np.random.randn(numSamples) * amp / 100
+    )  # ref signal
+    x_T = (
+        x_R
+        + np.random.randn(numSamples)
+        * amp
+        / 2
+        * (np.sin(n * 2 * np.pi * 3 / peaq.sr_hz) + 1)
+        / 2
+    )  # test signal
 
     x_R = x_R.reshape(1, numSamples)
     x_T = x_T.reshape(1, numSamples)

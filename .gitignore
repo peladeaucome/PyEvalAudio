@@ -9,3 +9,7 @@ PEAQ-to-python*
 *.pyc
 
 Data/*
+AFsp-v8r2/*
+
+*.npy
+*.bat

@@ -1,17 +1,18 @@
 import numpy as np
 import numpy.typing as npt
 import scipy.signal
-from numba import njit
+
+# from numba import njit
 
 
 class Mixin:
     def __init__(self):
         # 5.2.1 Delayed Averaging
         tauDel = 0.5
-        self.Ndel = int(np.ceil(tauDel * self.Fss_fft))
+        self.N500ms = int(np.ceil(tauDel * self.Fss_fft))
 
         tauOff = 0.05
-        self.Noff = int(np.ceil(tauOff * self.Fss_fft))
+        self.N50ms = int(np.ceil(tauOff * self.Fss_fft))
 
         m_dB = self.get_maskThreshold().reshape(1, self.numBarkBands, 1)
         self.gm = 1 / (self.idB10(m_dB))
@@ -20,41 +21,47 @@ class Mixin:
         """Finds and returns the data boundaries in frame index"""
         Athr = 200 * (self.Amax / 32768)
 
-        x_R_abs = np.abs(x_R)
-
         L = 5  # Number of samples in a window
         # Athr_over_L=Athr
 
         start_idx: int = 0
         val_R = np.sum(np.abs(x_R[:, start_idx : start_idx + L]), axis=1)
         # Finding the starting point
-        while np.amax(val_R) < Athr:
+        while np.min(val_R) < Athr:
             val_R += np.abs(x_R[:, start_idx + L]) - np.abs(x_R[:, start_idx])
             start_idx += 1
             # val_R = np.sum(np.abs(x_R[:, start_idx : start_idx + L]), axis=1)
 
-        end_idx: int = x_T.shape[1] - 1
+        end_idx: int = x_T.shape[1]
         val_R = np.sum(np.abs(x_R[:, end_idx - L : end_idx]), axis=1)
-        while np.amax(val_R) < Athr:
-            val_R += np.abs(x_R[:, end_idx - L]) - np.abs(x_R[:, end_idx])
+        while np.max(val_R) < Athr:
+            val_R += np.abs(x_R[:, end_idx - L - 1]) - np.abs(x_R[:, end_idx - 1])
             end_idx -= 1
             # val_R = np.sum(np.abs(x_R[:, end_idx - L : end_idx]), axis=1)
 
+        end_idx -= 1
+
+        endMin = self.NF // 2
         startFrame_idx, endFrame_idx = (
             start_idx // self.hopSize,
-            end_idx // self.hopSize - 1,
+            (end_idx + 1 - endMin) // self.hopSize,
         )
+
+        if self.verbose:
+            print(f"PEAQ data boundaries: {start_idx} - {end_idx}")
         # endFrame_idx += 1
         return startFrame_idx, endFrame_idx
 
     def compute_modulationChanges(
-        self, M_T, M_R, Ebar_R
+        self, M_T, M_R, Ebar_R, startFrame_idx=0
     ) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
 
+        Ndel = max(0, self.N500ms-startFrame_idx)
+
         # Delayed averaging
-        M_T = M_T.copy()[:, :, self.Ndel :]
-        M_R = M_R.copy()[:, :, self.Ndel :]
-        Ebar_R = Ebar_R.copy()[:, :, self.Ndel :]
+        M_T = M_T[:, :, Ndel :]
+        M_R = M_R[:, :, Ndel :]
+        Ebar_R = Ebar_R[:, :, Ndel :]
 
         numChannels, _, N = M_T.shape
         ## WinModDiff1B
@@ -118,7 +125,7 @@ class Mixin:
         # Mean across channels
         MAdiff2B = np.mean(MAdiff2B)
 
-        return MWdiff1B, MAdiff1B, MAdiff2B
+        return MWdiff1B, MAdiff1B, MAdiff2B, Ndel
 
     def compute_partialNoiseLoudness(
         self, EP_T, EP_R, M_R, M_T, alpha, T0, S0
@@ -141,13 +148,13 @@ class Mixin:
 
         return NL
 
-    def compute_RMSNoiseLoud(self, EP_T, EP_R, M_R, M_T, Ntot_T, Ntot_R):
+    def compute_RMSNoiseLoud(self, EP_T, EP_R, M_R, M_T, Ntot_T, Ntot_R, Ndel=0):
         NL = self.compute_partialNoiseLoudness(
             EP_T, EP_R, M_R, M_T, alpha=1.5, T0=0.15, S0=0.5
         )
 
         # Removing the start according to the loudness test
-        loudnessTest_idx = self.loudnessTest(Ntot_T, Ntot_R)
+        loudnessTest_idx = self.loudnessTest(Ntot_T, Ntot_R, Ndel)
         NL = NL[:, :, loudnessTest_idx:]
 
         # Spectral averaging, Eq. (90)
@@ -163,7 +170,7 @@ class Mixin:
         NLrmsB = np.mean(NLrmsB, axis=0)
         return NLrmsB
 
-    def loudnessTest(self, Ntot_T, Ntot_R):
+    def loudnessTest(self, Ntot_T, Ntot_R, Ndel=0):
         """Performs the loudness test (page 36).
 
         Inputs :
@@ -194,8 +201,8 @@ class Mixin:
                     loudEnough = True
 
         # Adding the additional delay of 50ms Noff
-        loudnessTest_idx = max(self.Noff, loudnessTest_idx)
-        loudnessTest_idx = max(loudnessTest_idx, self.Ndel)
+        loudnessTest_idx = self.N50ms  + loudnessTest_idx
+        loudnessTest_idx = max(loudnessTest_idx, Ndel)
 
         return loudnessTest_idx
 
@@ -221,26 +228,26 @@ class Mixin:
         numChannels, numBins, numFrames = X_T.shape
 
         # Decibel scale
-        X_T_dB = self.dB20(X_T)
-        X_R_dB = self.dB20(X_R)
+        X2_T = np.square(X_T)
+        X2_R = np.square(X_R)
 
         # Finding the threshold
         higherFreq_hz = 21586
         higherFreq_idx = int(self.NF * higherFreq_hz / self.sr_hz)
-        thresholdLevel = np.amax(X_T_dB[:, higherFreq_idx:-1, :], axis=1)
+        thresholdLevel = np.max(X2_T[:, higherFreq_idx:-1, :], axis=1)
 
         # Finding KR and KT
-        start_idx = np.ones((numChannels, numFrames), dtype=np.int32) * higherFreq_idx
+        start_idx = np.ones((numChannels, numFrames), dtype=np.int16) * higherFreq_idx
         KR = self.bandwidthSearch(
-            X_dB=X_R_dB, threshold_dB=thresholdLevel, gap_dB=10, start_idx=start_idx - 1
+            X=X2_R, threshold=thresholdLevel * self.idB10(10), start_idx=start_idx - 1
         )
         KT = self.bandwidthSearch(
-            X_dB=X_T_dB, threshold_dB=thresholdLevel, gap_dB=5, start_idx=KR - 1
+            X=X2_T, threshold=thresholdLevel * self.idB10(5), start_idx=KR - 1
         )
         # computing the means
-        weights = np.where(KR > 346, 1.0, 0.0)
+        weights = np.where(KR > 347, 1.0, 0.0)
         W_R = np.sum(KR * weights, axis=1) / np.sum(weights, axis=1)
-        weights = np.where(KT > 0, 1.0, 0.0)*weights
+        weights = np.where(KT > 0, 1.0, 0.0) * weights
         W_T = np.sum(KT * weights, axis=1) / np.sum(weights, axis=1)
 
         ## Mean across channels
@@ -250,34 +257,31 @@ class Mixin:
 
     @staticmethod
     def bandwidthSearch(
-        X_dB: npt.ArrayLike,
-        threshold_dB: float,
-        gap_dB: float,
+        X: npt.ArrayLike,
+        threshold: float,
         start_idx: npt.ArrayLike,
     ):
         """
-        Searches the 1st bin exceeding the ``threshold_dB`` value by ``gap_dB`` dBs.
+        Searches the 1st bin exceeding the ``threshold`` value.
         Used in compute_bandwidth
 
         Inputs:
         -------
-        - ``X_dB``: Array-like (c, F, T)
-            Magnitude spectrogram in dBs
-        - ``threshold_dB``: float
-            Threshold in dB
-        - ``gap_dB`` : float
+        - ``X``: Array-like (c, F, T)
+            Magnitude spectrogram
+        - ``threshold``: float
+            Threshold
         - ``start_idx``: Array-like (c, T)
             array of starting frequency indices.
         """
-        numChannels, _, numFrames = X_dB.shape
+        numChannels, _, numFrames = X.shape
 
         bandwidth_idx = np.zeros((numChannels, numFrames), dtype=np.int32)
         for chan_idx in range(numChannels):
             for frame_idx in range(numFrames):
                 bin_idx = start_idx[chan_idx, frame_idx]
                 while (
-                    X_dB[chan_idx, bin_idx, frame_idx]
-                    < threshold_dB[chan_idx, frame_idx] + gap_dB
+                    X[chan_idx, bin_idx, frame_idx] < threshold[chan_idx, frame_idx]
                     and bin_idx > 0
                 ):
                     bin_idx -= 1
@@ -416,36 +420,38 @@ class Mixin:
 
         L = 512
 
+        kmax = NL+M-1
         threshold_idx = self.find_energyThreshold(x_T=x_T, x_R=x_R, X_T=X_T)
 
-        D = np.zeros((numChannels, L, numFrames))
+        # D = np.zeros((numChannels, kmax, numFrames))
+        # for frame_idx in range(numFrames):
+        #     if threshold_idx[:, frame_idx] > 0:
+        #         D[:, :, frame_idx] = np.log(
+        #             np.square(X_T[:, :kmax, frame_idx] / X_R[:, :kmax, frame_idx])
+        #         )
 
-        for frame_idx in range(numFrames):
-            if threshold_idx[:, frame_idx] > 0:
-                D[:, :, frame_idx] = 2 * np.log(
-                    X_T[:, :L, frame_idx] / X_R[:, :L, frame_idx]
-                )
+        D = 2 * np.log(X_T[:,:kmax,:] / X_R[:,:kmax,:])
 
         # Normalized autocorrelation, Eq. (135)
         d0 = np.fft.rfft(D[:, :M, :], n=L, axis=1)
         d = np.fft.rfft(D, n=L, axis=1)
         c = np.conj(d0) * d
-        C = np.real(np.fft.irfft(c, axis=1, n=L))[:, :Lmax, :]
+        C = np.real(np.fft.irfft(c, axis=1, n=L))[:, :NL, :]
         # C = np.ones((numChannels, Lmax, numFrames))
 
         D0 = D[:, 0:M, :]
-        D0norm = self.squaredNorm(D0)
-        for l in range(0, Lmax):
-            if l == 0:
-                Dlnorm = D0norm
-            else:
-                Dlnorm = (
-                    Dlnorm + np.square(D[:, l + M - 1, :]) - np.square(D[:, l - 1, :])
-                )
-
-            res = np.sqrt(D0norm * Dlnorm)
-            C[:, l, :] /= res
-
+        D0norm = C[:,0,:].copy()
+        Dlnorm = D0norm
+        C[:,0,:]=1
+        for l in range(1, Lmax):
+            Dlnorm = (
+                Dlnorm + (np.square(D[:, l + M - 1, :]) - np.square(D[:, l - 1, :]))
+            )
+            
+            d=D0norm*Dlnorm
+            C[:,l,:] = np.where(d<=0, 1, C[:,l,:]/np.sqrt(d))
+            # C[:, l, :] /= np.sqrt(D0norm * Dlnorm)
+        
         # Windowed correlation, Eqs. (140), (141), (142)
         # H = self.get_hannWindow(NF=NL).reshape(1, NL, 1)
         H = self.get_hannWindow(NF=NL).reshape(1, NL, 1) / NL
@@ -454,27 +460,25 @@ class Mixin:
         Cw = H * (C - Cmean)
 
         S = np.square(np.abs(np.fft.rfft(Cw, axis=1, n=NL)))
-
-        EH_max = np.zeros((numChannels, numFrames))
-
         # This computation matches the Matlab code but not the report
-        EH_max = np.amax(S, axis=1)
+        EH_max = np.max(S[:, 1:, :], axis=1)
         EH_max = np.where(EH_max > S[:, 0, :], EH_max, 0)
+
+        # EH_max = np.zeros((numChannels, numFrames))
         # for channel_idx in range(numChannels):
         #     for frame_idx in range(numFrames):
-        #         val_prev = S[channel_idx, 0, frame_idx]
 
-        #         for n in range(1, NL // 2):
+        #         val_prev = S[channel_idx, 0, frame_idx]
+        #         for n in range(1, NL // 2+1):
         #             val = S[channel_idx, n, frame_idx]
         #             if val > val_prev:
         #                 if val > EH_max[channel_idx, frame_idx]:
         #                     EH_max[channel_idx, frame_idx] = val
-        #             val_prev=val
+        # val_prev = val
 
         ## Error Harmonic structure with energy threshold
-
-        EHB = 1000 * np.sum(EH_max * threshold_idx, axis=1) / np.sum(threshold_idx)
-
+        EHB = np.sum(EH_max * threshold_idx, axis=1) / np.sum(threshold_idx, axis=1)
+        EHB *= 1000
         # Mean across channels
         EHB = np.mean(EHB)
 
@@ -483,7 +487,7 @@ class Mixin:
     def find_energyThreshold(self, x_T, x_R, X_T):
         # Energy threshold, Eq. (145)
         A2thr = 8000 * np.square(self.Amax / 32768)
-        # Athr=8000
+        # A2thr=8000
         numChannels, _, numFrames = X_T.shape
 
         A2_T = np.zeros((numChannels, numFrames))
@@ -491,7 +495,7 @@ class Mixin:
 
         # energy calculation, Eq. (146)
         for frame_idx in range(numFrames):
-            start_idx = frame_idx * self.hopSize + self.NF // 2
+            start_idx = frame_idx * self.hopSize + self.hopSize
             end_idx = frame_idx * self.hopSize + self.NF
             A2_T[:, frame_idx] = np.sum(np.square(x_T[:, start_idx:end_idx]), axis=1)
             A2_R[:, frame_idx] = np.sum(np.square(x_R[:, start_idx:end_idx]), axis=1)
@@ -500,20 +504,20 @@ class Mixin:
         # A2_R = A2_R.reshape(numChannels, numFrames)
 
         # indices where the signal is below the threshold, Eq. (147)
-        idx_T = np.asarray(A2_T < A2thr, dtype=np.int32)
-        idx_R = np.asarray(A2_R < A2thr, dtype=np.int32)
+        idx_T = np.asarray(A2_T > A2thr, dtype=np.int32)
+        idx_R = np.asarray(A2_R > A2thr, dtype=np.int32)
 
         # Condition accross channels
-        idx_T = np.prod(idx_T, axis=0, keepdims=True)
-        idx_R = np.prod(idx_R, axis=0, keepdims=True)
+        idx_T = np.max(idx_T, axis=0, keepdims=True)
+        idx_R = np.max(idx_R, axis=0, keepdims=True)
 
         # Condition across signals
-        idx = idx_T * idx_R
+        idx = np.maximum(idx_T, idx_R)
 
         # Now the 1s in idx indicate where both channels of both signals are
         # under the threshold
 
         # Inverting the index so that the ones indicate where one of the signals
         # is above the threshold
-        idx = 1 - idx
+        #idx = 1 - idx
         return idx

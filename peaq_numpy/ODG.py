@@ -1,11 +1,12 @@
 import numpy as np
 import numpy.typing as npt
-import numba
+#import numba
+
 
 class Mixin:
-    def __init__(self):
+    def __init__(self, output='odg'):
         # The weights and biases are hardcoded as in the report
-
+        self.output=output
         wx = np.array(
             [
                 [-0.502657, 0.436333, 1.219602],
@@ -88,13 +89,19 @@ class Mixin:
 
         # Distortion index, Eq. (149)
         DI = self.neuralNet(MOVs_vect_norm)
-        print(f'DI: {DI}')
-        #Objective grade difference, Eq. (151)
+        # Objective grade difference, Eq. (151)
         bmin = -3.98
         bmax = 0.22
         ODG = bmin + (bmax - bmin) * self.sigmoid(DI)
-        
-        return ODG
+
+        if self.output == "odg":
+            return ODG
+        elif self.output == "di":
+            return DI
+        elif self.output == "full":
+            return ODG, DI
+        else:
+            raise ValueError()
 
 
 class Linear:

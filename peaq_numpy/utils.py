@@ -3,7 +3,7 @@ import numpy.typing as npt
 
 
 class Mixin:
-    def dB20(self, x:npt.ArrayLike, eps:float=1e-12) -> npt.ArrayLike:
+    def dB20(self, x:npt.ArrayLike) -> npt.ArrayLike:
         """
         Converts the input signal to sample-wise decibel scale.
         
@@ -11,8 +11,6 @@ class Mixin:
         ----------
         `x` : array-like
             input signal
-        `eps` : float
-            threshold to avoid digital errors, default = 1e-4.
         
         Returns:
         --------
@@ -21,7 +19,7 @@ class Mixin:
         """
         return 20*np.log10(np.abs(x))
 
-    def dB10(self, x:npt.ArrayLike, eps:float=1e-12) -> npt.ArrayLike:
+    def dB10(self, x:npt.ArrayLike) -> npt.ArrayLike:
         """
         Converts the input signal to sample-wise decibel scale.
         
@@ -29,8 +27,6 @@ class Mixin:
         ----------
         `x` : array-like
             input signal
-        `eps` : float
-            threshold to avoid digital errors, default = 1e-4.
         
         Returns:
         --------
