@@ -1,0 +1,51 @@
+                          
+
+
+Reference, Test items and resulting DI and ODG values for the 
+basic version of the Rec. ITU-R BS.1387:
+
+Nr           Reference     Test File    DI Basic      ODG Basic
+             File                       Version       Version
+                                                      
+1            arefsna.wav   acodsna.wav  1.304         -0.676
+2            breftri.wav   bcodtri.wav  1.949         -0.304
+3            crefsax.wav   ccodsax.wav  0.048         -1.829
+4            erefsmg.wav   ecodsmg.wav  1.731         -0.412
+5            frefsb1.wav   fcodsb1.wav  0.677         -1.195
+6            freftr1.wav   fcodtr1.wav  1.419         -0.598
+7            freftr2.wav   fcodtr2.wav  -0.045        -1.927
+8            freftr3.wav   fcodtr3.wav  -0.715        -2.601
+9            grefcla.wav   gcodcla.wav  1.781         -0.386
+10           irefsna.wav   icodsna.wav  -3.029        -3.786
+11           krefsme.wav   kcodsme.wav  3.093         0.038
+12           lrefhrp.wav   lcodhrp.wav  1.041         -0.876
+13           lrefpip.wav   lcodpip.wav  1.973         -0.293
+14           mrefcla.wav   mcodcla.wav  -0.436        -2.331
+15           nrefsfe.wav   ncodsfe.wav  3.135         0.045
+16           srefclv.wav   scodclv.wav  1.689         -0.435
+
+
+
+Reference, Test items and resulting DI and ODG values for the 
+advanced version Rec. ITU-R BS.1387:
+
+Nr           Reference     Test File    DI Advanced   ODG Advanced
+             File                       Version       Version
+                                                      
+1            arefsna.wav   acodsna.wav  1.632         -0.467
+2            breftri.wav   bcodtri.wav  2.000         -0.281
+3            crefsax.wav   ccodsax.wav  0.567         -1.300
+4            erefsmg.wav   ecodsmg.wav  1.594         -0.489
+5            frefsb1.wav   fcodsb1.wav  1.039         -0.877
+6            freftr1.wav   fcodtr1.wav  1.555         -0.512
+7            freftr2.wav   fcodtr2.wav  0.162         -1.711
+8            freftr3.wav   fcodtr3.wav  -0.783        -2.662
+9            grefcla.wav   gcodcla.wav  1.457         -0.573
+10           irefsna.wav   icodsna.wav  -2.510        -3.664
+11           krefsme.wav   kcodsme.wav  2.765         -0.029
+12           lrefhrp.wav   lcodhrp.wav  1.538         -0.523
+13           lrefpip.wav   lcodpip.wav  2.149         -0.219
+14           mrefcla.wav   mcodcla.wav  0.430         -1.435
+15           nrefsfe.wav   ncodsfe.wav  3.163         0.050
+16           srefclv.wav   scodclv.wav  1.972         -0.293
+

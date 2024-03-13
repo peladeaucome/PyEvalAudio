@@ -2,7 +2,7 @@ import numpy as np
 import numpy.typing as npt
 import scipy.signal
 
-# from numba import njit
+from numba import njit
 
 
 class Mixin:
@@ -256,6 +256,7 @@ class Mixin:
         return W_R, W_T
 
     @staticmethod
+    @njit
     def bandwidthSearch(
         X: npt.ArrayLike,
         threshold: float,

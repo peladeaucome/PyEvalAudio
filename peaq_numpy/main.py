@@ -107,17 +107,23 @@ class PEAQ(
         Ebar_R,
         Ntot_T,
         Ntot_R,
-        startFrame_idx=0
+        startFrame_idx=0,
     ):
 
         MWdiff1B, MAdiff1B, MAdiff2B, Ndel = self.compute_modulationChanges(
-            M_T=M_T, M_R=M_R, Ebar_R=Ebar_R,startFrame_idx =startFrame_idx
+            M_T=M_T, M_R=M_R, Ebar_R=Ebar_R, startFrame_idx=startFrame_idx
         )
 
         W_R, W_T = self.compute_bandwidth(X_T=X_T, X_R=X_R)
 
         NLrmsB = self.compute_RMSNoiseLoud(
-            EP_T=EP_T, EP_R=EP_R, M_R=M_R, M_T=M_T, Ntot_T=Ntot_T, Ntot_R=Ntot_R, Ndel=Ndel
+            EP_T=EP_T,
+            EP_R=EP_R,
+            M_R=M_R,
+            M_T=M_T,
+            Ntot_T=Ntot_T,
+            Ntot_R=Ntot_R,
+            Ndel=Ndel,
         )
 
         RNMtot, RelDistFrames = self.masking(
@@ -155,26 +161,22 @@ class PEAQ(
         patt = self.patternProcessing(Es_T, Es_R)
 
         return patt
-
-    def compute_PEAQ(self, x_T, x_R):
+    
+    def waveformsToMovs(self, x_T, x_R):
         X_T, X_R, Es_T, Es_R, EsTilde_T, EsTilde_R, EbN = self.timeToFrequencyDomain(
             x_T, x_R
         )
 
         patt = self.patternProcessing(Es_T, Es_R)
         EP_T, EP_R, M_T, M_R, Ebar_R, Ntot_T, Ntot_R = patt
-        
+
         startFrame_idx, endFrame_idx = self.get_dataBoundary(x_T=x_T, x_R=x_R)
 
         startSample_idx = startFrame_idx * self.hopSize
-        endSample_idx = endFrame_idx*self.hopSize+self.NF
+        endSample_idx = endFrame_idx * self.hopSize + self.NF
 
-        x_T = x_T[
-            :, startSample_idx : endSample_idx
-        ]
-        x_R = x_R[
-            :, startSample_idx  : endSample_idx
-        ]
+        x_T = x_T[:, startSample_idx:endSample_idx]
+        x_R = x_R[:, startSample_idx:endSample_idx]
 
         (
             X_T,
@@ -213,7 +215,6 @@ class PEAQ(
         if self.verbose:
             print(f"Fstart: {startFrame_idx}, Fend: {endFrame_idx}")
 
-        
         MOVs_vect = self.compute_allMOVs(
             x_T=x_T,
             x_R=x_R,
@@ -231,14 +232,46 @@ class PEAQ(
             Ebar_R=Ebar_R,
             Ntot_T=Ntot_T,
             Ntot_R=Ntot_R,
-            startFrame_idx=startFrame_idx
+            startFrame_idx=startFrame_idx,
         )
 
+        return MOVs_vect
+
+    def compute_PEAQ(self, x_T, x_R):
+        
+        MOVs_vect = self.waveformsToMovs(x_T, x_R)
         if self.verbose:
             self.print_movs(MOVs_vect)
 
         ODG = self.ODG(MOVs_vect=MOVs_vect)
         return ODG
+
+    def compute_2fmodel(self, AvgModDiff1, ADB):
+        d = 49.73
+        m = -0.0315
+        c = -0.73
+
+        Avg = d/(1+np.square(m*AvgModDiff1+c))
+
+        alpha1 = -46.96
+        alpha0 = 147.12
+        MMSest = Avg + alpha1*ADB + alpha0
+        return MMSest
+    
+    def compute_PEAQ_2fmodel(self, x_T, x_R):
+        MOVs_vect = self.waveformsToMovs(x_T, x_R)
+
+        if self.verbose:
+            self.print_movs(MOVs_vect)
+        
+        ODG = self.ODG(MOVs_vect=MOVs_vect)
+        
+        AvgModDiff1=MOVs_vect[6]
+        ADB=MOVs_vect[4]
+
+        MMS_est = self.compute_2fmodel(AvgModDiff1=AvgModDiff1, ADB=ADB)
+
+        return ODG, MMS_est
 
     @staticmethod
     def print_movs(MOVs_vect):
@@ -260,13 +293,11 @@ class PEAQ(
             print(f"{MOVs_names[idx]}: {MOVs_vect[idx]}")
 
 
-
-
 def crop_multiple(*X_list, start_idx, end_idx):
     out = []
-    
+
     for X in X_list:
-        out.append(X[..., start_idx : end_idx+1])
+        out.append(X[..., start_idx : end_idx + 1])
     return tuple(out)
 
 

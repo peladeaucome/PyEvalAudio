@@ -50,9 +50,9 @@ def get_refAndCod():
 
     for name in all_names:
         if "ref" in name:
-            ref.append(name.upper())
+            ref.append(name.lower())
         else:
-            cod.append(name.upper())
+            cod.append(name.lower())
 
     return ref, cod
 

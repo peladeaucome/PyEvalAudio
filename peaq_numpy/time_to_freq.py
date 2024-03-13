@@ -3,7 +3,7 @@ import numpy.typing as npt
 from . import critical_bands
 import matplotlib.pyplot as plt
 
-# from numba import njit
+from numba import njit
 
 
 class Mixin:
@@ -399,7 +399,7 @@ def frequencySpreading_jit(E, barkwidth, f_c, B_s):
     return Es
 
 
-# @njit
+@njit
 def apply_frequencyGrouping_jit(Xw2: npt.ArrayLike, U: npt.ArrayLike) -> npt.ArrayLike:
     numChannels, _, numFrames = Xw2.shape
     numBarkBands = U.shape[2]

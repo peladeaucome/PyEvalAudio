@@ -30,8 +30,8 @@ if __name__=='__main__':
     parser = init_parser()
     args = parser.parse_args()
 
-    Fref = os.path.normpath(f"Data/Conformance_Test_Items/{args.pre}REF{args.post}.WAV")
-    Ftest = os.path.normpath(f"Data/Conformance_Test_Items/{args.pre}COD{args.post}.WAV")
+    Fref = os.path.normpath(f"Data/Conformance_Test_Items/{args.pre}ref{args.post}.wav")
+    Ftest = os.path.normpath(f"Data/Conformance_Test_Items/{args.pre}cod{args.post}.wav")
 
     print(f"Ref:  {Fref}\nTest: {Ftest}")
 
