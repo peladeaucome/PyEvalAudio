@@ -15,7 +15,7 @@ def idB20(x_dB):
     return np.power(10, x_dB / 20)
 
 
-class Compressor(AudioEffect):
+class CompressorBranching(AudioEffect):
     def __init__(
         self,
         threshold_dB,
@@ -40,7 +40,7 @@ class Compressor(AudioEffect):
         alphaR = compute_timeConstants(self.releaseTime_ms / 1000, self.samplerate)
         return alphaA, alphaR
 
-    def compute_dynamicGain(self,x):
+    def compute_dynamicGain(self, x):
 
         xG = dB20(x, eps=1e-6)
 
@@ -53,16 +53,14 @@ class Compressor(AudioEffect):
         c = idB20(-yL)
 
         return c
-    
 
     def process(self, x):
-        c=self.compute_dynamicGain(x)
+        c = self.compute_dynamicGain(x)
         return x * c
-    
+
     def sidechain(self, xMain, xSide):
-        c=self.compute_dynamicGain(xSide)
+        c = self.compute_dynamicGain(xSide)
         return xMain * c
-    
 
     def gainComputer(self, xG):
         T = self.threshold_dB
@@ -79,11 +77,11 @@ class Compressor(AudioEffect):
         return yG
 
     def levelSmoothing(self, xL):
-        return levelSmoothing_jit(xL, self.alphaA, self.alphaR)
+        return levelSmoothingBranching_jit(xL, self.alphaA, self.alphaR)
 
 
 @njit
-def levelSmoothing_jit(xL, alphaA, alphaR):
+def levelSmoothingBranching_jit(xL, alphaA, alphaR):
     yprev = 0
     yL = np.zeros_like(xL)
     for n in range(len(xL)):
@@ -92,4 +90,21 @@ def levelSmoothing_jit(xL, alphaA, alphaR):
         else:
             yprev = alphaR * yprev + (1 - alphaR) * xL[n]
         yL[n] = yprev
+    return yL
+
+
+class CompressorDecoupled(CompressorBranching):
+    def levelSmoothing(self, xL):
+        return levelSmoothingDecoupled_jit(xL, self.alphaA, self.alphaR)
+
+@njit
+def levelSmoothingDecoupled_jit(xL, alphaA, alphaR):
+    y1 = 0
+    yL_p = 0
+    yL = np.zeros_like(xL)
+    for n in range(len(xL)):
+        xLn = xL[n]
+        y1 = max(xLn, alphaR*y1 + (1-alphaR)*xLn)
+        yL_p = alphaA*yL_p+(1-alphaA)*y1
+        yL[n]=yL_p
     return yL

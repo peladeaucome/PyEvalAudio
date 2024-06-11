@@ -462,20 +462,20 @@ class Mixin:
 
         S = np.square(np.abs(np.fft.rfft(Cw, axis=1, n=NL)))
         # This computation matches the Matlab code but not the report
-        EH_max = np.max(S[:, 1:, :], axis=1)
-        EH_max = np.where(EH_max > S[:, 0, :], EH_max, 0)
+        # EH_max = np.max(S[:, 1:, :], axis=1)
+        # EH_max = np.where(EH_max > S[:, 0, :], EH_max, 0)
 
-        # EH_max = np.zeros((numChannels, numFrames))
-        # for channel_idx in range(numChannels):
-        #     for frame_idx in range(numFrames):
+        EH_max = np.zeros((numChannels, numFrames))
+        for channel_idx in range(numChannels):
+            for frame_idx in range(numFrames):
 
-        #         val_prev = S[channel_idx, 0, frame_idx]
-        #         for n in range(1, NL // 2+1):
-        #             val = S[channel_idx, n, frame_idx]
-        #             if val > val_prev:
-        #                 if val > EH_max[channel_idx, frame_idx]:
-        #                     EH_max[channel_idx, frame_idx] = val
-        # val_prev = val
+                val_prev = S[channel_idx, 0, frame_idx]
+                for n in range(1, NL // 2+1):
+                    val = S[channel_idx, n, frame_idx]
+                    if val > val_prev:
+                        if val > EH_max[channel_idx, frame_idx]:
+                            EH_max[channel_idx, frame_idx] = val
+                    val_prev = val
 
         ## Error Harmonic structure with energy threshold
         EHB = np.sum(EH_max * threshold_idx, axis=1) / np.sum(threshold_idx, axis=1)

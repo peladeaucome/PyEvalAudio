@@ -23,6 +23,7 @@ class EffectSeries(AudioEffect):
         out=x.copy()
         for effect in self.effects_list:
             out=effect(x)
+        return out
     
     def append(self, effect):
         self.check(effect)

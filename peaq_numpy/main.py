@@ -11,10 +11,30 @@ from . import ODG
 class PEAQ(
     utils.Mixin, time_to_freq.Mixin, pattern_processing.Mixin, MOVs.Mixin, ODG.Mixin
 ):
-    """The advanced-mode is not used for now."""
+    """The advanced-mode is not implemented for now."""
 
-    def __init__(self, mode="basic", Amax=32768, verbose=True, output="odg"):
-
+    def __init__(
+        self,
+        mode: str = "basic",
+        Amax: float = 32768,
+        verbose: bool = True,
+        output: str = "odg",
+    ):
+        """
+        Inputs:
+        -------
+        ``mode``: String
+            PEAQ computation mode. Only basic is implemented now.
+        ``Amax``: Float
+            Maximum absolute peak value of input waveforms. Should be set to 1
+            if waveforms are between -1 and 1.
+        ``verbose``: String
+            Enables printing compreshensive information during computations.
+        ``output``: String
+            chooses what to output when computing PEAQ score.
+            Set as ``odg`` to output only the objective difference grade or
+            ``full`` to output all MOVs.
+        """
         self.verbose = verbose
         if verbose:
             print("Init start")
@@ -161,7 +181,7 @@ class PEAQ(
         patt = self.patternProcessing(Es_T, Es_R)
 
         return patt
-    
+
     def waveformsToMovs(self, x_T, x_R):
         X_T, X_R, Es_T, Es_R, EsTilde_T, EsTilde_R, EbN = self.timeToFrequencyDomain(
             x_T, x_R
@@ -238,7 +258,7 @@ class PEAQ(
         return MOVs_vect
 
     def compute_PEAQ(self, x_T, x_R):
-        
+
         MOVs_vect = self.waveformsToMovs(x_T, x_R)
         if self.verbose:
             self.print_movs(MOVs_vect)
@@ -251,23 +271,24 @@ class PEAQ(
         m = -0.0315
         c = -0.73
 
-        Avg = d/(1+np.square(m*AvgModDiff1+c))
+        Avg = d / (1 + np.square(m * AvgModDiff1 + c))
 
         alpha1 = -46.96
         alpha0 = 147.12
-        MMSest = Avg + alpha1*ADB + alpha0
+        MMSest = Avg + alpha1 * ADB + alpha0
+        MMSest = max(0, min(MMSest, 100))
         return MMSest
-    
+
     def compute_PEAQ_2fmodel(self, x_T, x_R):
         MOVs_vect = self.waveformsToMovs(x_T, x_R)
 
         if self.verbose:
             self.print_movs(MOVs_vect)
-        
+
         ODG = self.ODG(MOVs_vect=MOVs_vect)
-        
-        AvgModDiff1=MOVs_vect[6]
-        ADB=MOVs_vect[4]
+
+        AvgModDiff1 = MOVs_vect[6]
+        ADB = MOVs_vect[4]
 
         MMS_est = self.compute_2fmodel(AvgModDiff1=AvgModDiff1, ADB=ADB)
 

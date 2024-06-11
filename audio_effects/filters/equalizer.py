@@ -9,7 +9,7 @@ class EQBand(Filter):
         super().__init__(samplerate)
 
     def compute_intermediateValues(self):
-        A = np.power(self.g_dB/40)
+        A = np.power(10, self.g_dB/40)
         w0 = 2*np.pi*self.f0/self.samplerate
         alpha = np.sin(w0)/(2*self.Q)
         return A, w0, alpha
