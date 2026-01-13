@@ -72,3 +72,19 @@ If you use it in research, please cite it as:
     date={2026},
 }
 ```
+
+This work is a Python implementation of the following:
+ - P. Kabal. An Examination and Interpretation of ITU-r BS.1387: Per-
+ceptual Evaluation of Audio Quality. Tech. rep. McGill University,
+2003
+ - Thorsten Kastner and Jürgen Herre. “An Efficient Model for Estimating
+Subjective Quality of Separated Audio Source Signals”. In: WASPAA
+2019. 2019, pp. 95–99
+ - Thorsten Kastner and Jürgen Herre. AudioLabs - Subjective
+Evaluation of Blind Audio Source Separation Database SEBASS-DB.
+https://www.audiolabs-erlangen.de/resources/2019-WASPAA-
+SEBASS/.
+```
+
+
+```
