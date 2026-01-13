@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from test_all import get_refAndCod
 import results
 
+# plt.style.use('dark_background')
+
 class result():
     def __init__(self, data, marker):
         self.data=data
@@ -64,24 +66,6 @@ ODG_PQeval_matlab = np.array([
     -0.414
 ])
 
-ODG_PQeval_expected = np.array([
-    1.2,
-    .5,
-    3.2,
-    0.7,
-    2.1,
-    0.8,
-    2.4,
-    3.5,
-    0.8,
-    6.0,
-    0.,
-    1.5,
-    0.1,
-    3.75,
-    -.05,
-    0.7
-])/6.4*(-4)
 
 
 ODG_PEAQ = results.get_ODG_list()
@@ -89,17 +73,16 @@ ODG_PEAQ = results.get_ODG_list()
 computed_ODG = np.load('computed_ODG.npy')
 
 computed_ODG = result(computed_ODG, marker='x')
-ODG_PQeval_C = result(ODG_PQeval_C, marker='+')
 ODG_PQeval_matlab = result(ODG_PQeval_matlab, marker='+')
-
-ODG_PQeval_expected = result(ODG_PQeval_expected, marker='1')
-ODG_PEAQ = result(ODG_PEAQ, marker='x')
+ODG_PQeval_C = result(ODG_PQeval_C, marker='2')
+ODG_PEAQ = result(ODG_PEAQ, marker='1')
 
 
 results_dict = {
-    'PyPEAQ (Ours)':computed_ODG,
-    'PQevalAudio (Computed)':ODG_PQeval_matlab,
-    'PQevalAudio (Expected)': ODG_PQeval_expected,
+    'PyEvalAudio (Ours)':computed_ODG,
+    'PQevalAudio (Matlab)':ODG_PQeval_matlab,
+    'PQevalAudio (C)':ODG_PQeval_C,
+    'PEAQ (Expected)': ODG_PEAQ,
 }
 
 x = np.arange(16)
@@ -125,6 +108,7 @@ plt.ylabel('ODG')
 
 plt.tight_layout()
 plt.savefig('Figures/Article/PEAQresultsComparison.pdf')
+plt.savefig('Figures/Article/PEAQresultsComparison.svg')
 #plt.show()
 plt.close()
 
@@ -135,3 +119,4 @@ DI_PEAQ = results.get_DI_list()
 
 print(f"ODG RMSE computed:    {RMSE(x=ODG_to_DI(computed_ODG.data), y=DI_PEAQ)}")
 print(f"ODG RMSE PQevalAudio: {RMSE(x=ODG_to_DI(ODG_PQeval_matlab.data), y=DI_PEAQ)}")
+print(RMSE(computed_ODG.data-ODG_PQeval_matlab.data))

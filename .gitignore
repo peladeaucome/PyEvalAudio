@@ -8,6 +8,7 @@ PEAQ-to-python*
 */__pycache__/*
 *.pyc
 AFsp-v8r2/*
+ds_test_2fmodel_pqevalaudio/*
 
 *.npy
 *.bat

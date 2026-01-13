@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy.typing as npt
+from typing import Literal
 from . import utils
 from . import time_to_freq
 from . import pattern_processing
@@ -15,10 +16,10 @@ class PEAQ(
 
     def __init__(
         self,
-        mode: str = "basic",
+        mode: Literal["basic", "advanced"] = "basic",
         Amax: float = 32768,
         verbose: bool = True,
-        output: str = "odg",
+        output: Literal["odg", "di", "full"] = "odg",
     ):
         """
         Inputs:
@@ -38,6 +39,9 @@ class PEAQ(
         self.verbose = verbose
         if verbose:
             print("Init start")
+
+        if mode == "advanced":
+            raise NotImplementedError("Advanced mode is not implemented")
 
         time_to_freq.Mixin.__init__(self, mode=mode, Amax=Amax)
         pattern_processing.Mixin.__init__(self)
@@ -172,16 +176,7 @@ class PEAQ(
             ]
         )
         return MOVs_vect
-
-    def two_f_model(self, x_T, x_R):
-        X_T, X_R, Es_T, Es_R, EsTilde_T, EsTilde_R, EbN = self.timeToFrequencyDomain(
-            x_T, x_R
-        )
-
-        patt = self.patternProcessing(Es_T, Es_R)
-
-        return patt
-
+    
     def waveformsToMovs(self, x_T, x_R):
         X_T, X_R, Es_T, Es_R, EsTilde_T, EsTilde_R, EbN = self.timeToFrequencyDomain(
             x_T, x_R
@@ -266,18 +261,158 @@ class PEAQ(
         ODG = self.ODG(MOVs_vect=MOVs_vect)
         return ODG
 
-    def compute_2fmodel(self, AvgModDiff1, ADB):
-        d = 49.73
-        m = -0.0315
-        c = -0.73
+    def compute_2fmodel_from_MOVs(self, AvgModDiff1, ADB):
+        d = 56.1345
+        m = -0.0282
+        c = -0.8628
+        alpha1 = -27.1451
+        alpha0 = 86.3515
 
         Avg = d / (1 + np.square(m * AvgModDiff1 + c))
 
-        alpha1 = -46.96
-        alpha0 = 147.12
-        MMSest = Avg + alpha1 * ADB + alpha0
-        MMSest = max(0, min(MMSest, 100))
-        return MMSest
+        MMS_est = Avg + alpha1 * ADB + alpha0
+        MMS_est = max(0, min(MMS_est, 100))
+        return MMS_est
+
+    def compute_2fmodel_from_waveform(self, x_T, x_R):
+        X_T, X_R, Es_T, Es_R, EsTilde_T, EsTilde_R, EbN = self.timeToFrequencyDomain(
+            x_T, x_R
+        )
+
+        patt = self.patternProcessing(Es_T, Es_R)
+        EP_T, EP_R, M_T, M_R, Ebar_R, Ntot_T, Ntot_R = patt
+
+        startFrame_idx, endFrame_idx = self.get_dataBoundary(x_T=x_T, x_R=x_R)
+
+        startSample_idx = startFrame_idx * self.hopSize
+        endSample_idx = endFrame_idx * self.hopSize + self.NF
+
+        x_T = x_T[:, startSample_idx:endSample_idx]
+        x_R = x_R[:, startSample_idx:endSample_idx]
+
+        (
+            X_T,
+            X_R,
+            Es_T,
+            Es_R,
+            EsTilde_T,
+            EsTilde_R,
+            EbN,
+            EP_T,
+            EP_R,
+            M_T,
+            M_R,
+            Ebar_R,
+            Ntot_T,
+            Ntot_R,
+        ) = crop_multiple(
+            X_T,
+            X_R,
+            Es_T,
+            Es_R,
+            EsTilde_T,
+            EsTilde_R,
+            EbN,
+            EP_T,
+            EP_R,
+            M_T,
+            M_R,
+            Ebar_R,
+            Ntot_T,
+            Ntot_R,
+            start_idx=startFrame_idx,
+            end_idx=endFrame_idx,
+        )
+
+        if self.verbose:
+            print(f"Fstart: {startFrame_idx}, Fend: {endFrame_idx}")
+
+        _, MAdiff1B, _, _ = self.compute_modulationChanges(
+            M_T=M_T, M_R=M_R, Ebar_R=Ebar_R, startFrame_idx=startFrame_idx
+        )
+
+        _, ADB_B = self.detectionProbability(EsTilde_T=EsTilde_T, EsTilde_R=EsTilde_R)
+
+        AvgModDiff1 = MAdiff1B
+        ADB = ADB_B
+
+        MMS_est = self.compute_2fmodel_from_MOVs(AvgModDiff1=AvgModDiff1, ADB=ADB)
+        return MMS_est
+
+    def waveformsToMovs(self, x_T, x_R):
+        X_T, X_R, Es_T, Es_R, EsTilde_T, EsTilde_R, EbN = self.timeToFrequencyDomain(
+            x_T, x_R
+        )
+
+        patt = self.patternProcessing(Es_T, Es_R)
+        EP_T, EP_R, M_T, M_R, Ebar_R, Ntot_T, Ntot_R = patt
+
+        startFrame_idx, endFrame_idx = self.get_dataBoundary(x_T=x_T, x_R=x_R)
+
+        startSample_idx = startFrame_idx * self.hopSize
+        endSample_idx = endFrame_idx * self.hopSize + self.NF
+
+        x_T = x_T[:, startSample_idx:endSample_idx]
+        x_R = x_R[:, startSample_idx:endSample_idx]
+
+        (
+            X_T,
+            X_R,
+            Es_T,
+            Es_R,
+            EsTilde_T,
+            EsTilde_R,
+            EbN,
+            EP_T,
+            EP_R,
+            M_T,
+            M_R,
+            Ebar_R,
+            Ntot_T,
+            Ntot_R,
+        ) = crop_multiple(
+            X_T,
+            X_R,
+            Es_T,
+            Es_R,
+            EsTilde_T,
+            EsTilde_R,
+            EbN,
+            EP_T,
+            EP_R,
+            M_T,
+            M_R,
+            Ebar_R,
+            Ntot_T,
+            Ntot_R,
+            start_idx=startFrame_idx,
+            end_idx=endFrame_idx,
+        )
+
+        if self.verbose:
+            print(f"Fstart: {startFrame_idx}, Fend: {endFrame_idx}")
+
+        MOVs_vect = self.compute_allMOVs(
+            x_T=x_T,
+            x_R=x_R,
+            X_T=X_T,
+            X_R=X_R,
+            Es_T=Es_T,
+            Es_R=Es_R,
+            EsTilde_T=EsTilde_T,
+            EsTilde_R=EsTilde_R,
+            EbN=EbN,
+            EP_T=EP_T,
+            EP_R=EP_R,
+            M_T=M_T,
+            M_R=M_R,
+            Ebar_R=Ebar_R,
+            Ntot_T=Ntot_T,
+            Ntot_R=Ntot_R,
+            startFrame_idx=startFrame_idx,
+        )
+
+        return MOVs_vect
 
     def compute_PEAQ_2fmodel(self, x_T, x_R):
         MOVs_vect = self.waveformsToMovs(x_T, x_R)
@@ -287,10 +422,10 @@ class PEAQ(
 
         ODG = self.ODG(MOVs_vect=MOVs_vect)
 
-        AvgModDiff1 = MOVs_vect[6]
         ADB = MOVs_vect[4]
+        AvgModDiff1 = MOVs_vect[6]
 
-        MMS_est = self.compute_2fmodel(AvgModDiff1=AvgModDiff1, ADB=ADB)
+        MMS_est = self.compute_2fmodel_from_MOVs(AvgModDiff1=AvgModDiff1, ADB=ADB)
 
         return ODG, MMS_est
 

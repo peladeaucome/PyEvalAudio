@@ -111,11 +111,11 @@ class Resampler:
 
 if __name__ == "__main__":
 
-    def dB20(x):
-        return 20 * np.log(np.maximum(np.abs(x), 1e-10))
+    def dB20(x, eps:float=1e-10):
+        return 20 * np.log(np.maximum(np.abs(x), eps))
     
-    def dB10(x):
-        return 10 * np.log(np.maximum(np.abs(x), 1e-10))
+    def dB10(x, eps:float=1e-10):
+        return 10 * np.log(np.maximum(np.abs(x), eps))
 
     @dataclass
     class AudioSignal:
