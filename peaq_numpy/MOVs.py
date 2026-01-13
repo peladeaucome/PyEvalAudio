@@ -1,5 +1,4 @@
 import numpy as np
-import numpy.typing as npt
 import scipy.signal
 
 from numba import njit
@@ -54,7 +53,7 @@ class Mixin:
 
     def compute_modulationChanges(
         self, M_T, M_R, Ebar_R, startFrame_idx=0
-    ) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
         Ndel = max(0, self.N500ms-startFrame_idx)
 
@@ -129,7 +128,7 @@ class Mixin:
 
     def compute_partialNoiseLoudness(
         self, EP_T, EP_R, M_R, M_T, alpha, T0, S0
-    ) -> npt.ArrayLike:
+    ) -> np.ndarray:
 
         beta = np.exp(-alpha * ((EP_T - EP_R) / EP_R))
 
@@ -258,9 +257,9 @@ class Mixin:
     @staticmethod
     @njit
     def bandwidthSearch(
-        X: npt.ArrayLike,
+        X: np.ndarray,
         threshold: float,
-        start_idx: npt.ArrayLike,
+        start_idx: np.ndarray,
     ):
         """
         Searches the 1st bin exceeding the ``threshold`` value.
@@ -301,7 +300,7 @@ class Mixin:
         return m_dB
 
     def masking(
-        self, EsTilde_T: npt.ArrayLike, EsTilde_R: npt.ArrayLike, EbN: npt.ArrayLike
+        self, EsTilde_T: np.ndarray, EsTilde_R: np.ndarray, EbN: np.ndarray
     ):
         numChannels, numBins, numFrames = EbN.shape
         # Masking threshold, Eq. (114)
@@ -407,10 +406,10 @@ class Mixin:
 
     def errorHarmonicStructure(
         self,
-        X_T: npt.ArrayLike,
-        X_R: npt.ArrayLike,
-        x_T: npt.ArrayLike,
-        x_R: npt.ArrayLike,
+        X_T: np.ndarray,
+        X_R: np.ndarray,
+        x_T: np.ndarray,
+        x_R: np.ndarray,
     ):
         numChannels, numBands, numFrames = X_T.shape
         # Difference weighted log spectra, Eq. (133)

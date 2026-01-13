@@ -1,7 +1,5 @@
 import numpy as np
-import numpy.typing as npt
 from . import critical_bands
-import matplotlib.pyplot as plt
 
 from numba import njit
 
@@ -30,7 +28,7 @@ class Mixin:
 
         # FFT frequencies
         self.numFftBands: int = 1025
-        self.f_hz: npt.ArrayLike = np.fft.rfftfreq(n=2048, d=1 / self.sr_hz)
+        self.f_hz: np.ndarray = np.fft.rfftfreq(n=2048, d=1 / self.sr_hz)
 
         # loudness scaling
         self.G_L: float = 3.503992537617512
@@ -45,10 +43,10 @@ class Mixin:
         # )
 
         # Hann window
-        self.window: npt.ArrayLike = self.get_hannWindow(NF=self.NF)
+        self.window: np.ndarray = self.get_hannWindow(NF=self.NF)
 
         # FFT weighting filter
-        self.W: npt.ArrayLike = self.get_earFilter()
+        self.W: np.ndarray = self.get_earFilter()
 
         # Critical bands of the FFT model
         self.f_l, self.f_c, self.f_u = self.get_BarkBandsFreqs()
@@ -71,11 +69,11 @@ class Mixin:
         timeConstants = self.get_TimeConstants(
             f=self.f_c[:, 0], tau100_s=0.030, tauMin_s=0.008
         ).reshape(1, self.numBarkBands)
-        self.timeToFreqAlpha: npt.ArrayLike = np.exp(
+        self.timeToFreqAlpha: np.ndarray = np.exp(
             -1 / (self.Fss_fft * timeConstants)
         )
 
-    def get_hannWindow(self, NF: int = 1025) -> npt.ArrayLike:
+    def get_hannWindow(self, NF: int = 1025) -> np.ndarray:
         """
         Returns a scaled Hann window.
 
@@ -97,7 +95,7 @@ class Mixin:
         h *= np.sqrt(8 / 3)  # Scaling the output
         return h
 
-    def apply_STFT(self, x: npt.ArrayLike) -> npt.ArrayLike:
+    def apply_STFT(self, x: np.ndarray) -> np.ndarray:
         """Computes the STFT of x"""
 
         numChannels, numSamples = x.shape
@@ -124,7 +122,7 @@ class Mixin:
 
         return X
 
-    def get_earFilter(self) -> npt.ArrayLike:
+    def get_earFilter(self) -> np.ndarray:
         """
         Returns the weights of the spectral weighting filter:
 
@@ -145,7 +143,7 @@ class Mixin:
         W[0] = 0
         return W.reshape(1, self.numFftBands, 1)
 
-    def hzToBark(self, f_hz: npt.ArrayLike) -> npt.ArrayLike:
+    def hzToBark(self, f_hz: np.ndarray) -> np.ndarray:
         """
         Converts from Hertz to Bark scale.
 
@@ -162,7 +160,7 @@ class Mixin:
         z = 7 * np.arcsinh(f_hz / 650)
         return z
 
-    def barkToHz(self, z: npt.ArrayLike) -> npt.ArrayLike:
+    def barkToHz(self, z: np.ndarray) -> np.ndarray:
         """
         Converts frequencies from Bark scale to Hertz.
 
@@ -183,7 +181,7 @@ class Mixin:
         self,
         lowerBound_hz: float = 80,
         upperBound_hz: float = 18000,
-    ) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike, int]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
         """
         Returns the lower, higher and center frequencies of all Bark bands.
         """
@@ -210,7 +208,7 @@ class Mixin:
 
     def get_barkBinGrouping(
         self,
-    ) -> npt.ArrayLike:
+    ) -> np.ndarray:
 
         f_u = self.f_u.reshape(1, 1, self.numBarkBands, 1)
         f_l = self.f_l.reshape(1, 1, self.numBarkBands, 1)
@@ -224,7 +222,7 @@ class Mixin:
         # U=U.reshape(1,  self.numFftBands, self.numBarkBands, 1)
         return U
 
-    def get_internalNoise(self, f) -> npt.ArrayLike:
+    def get_internalNoise(self, f) -> np.ndarray:
         zeros = np.where(f < 1e-12)
         # other = np.where(f >= 1e-12)
         Ein_dB = np.ones_like(f)
@@ -400,7 +398,7 @@ def frequencySpreading_jit(E, barkwidth, f_c, B_s):
 
 
 @njit
-def apply_frequencyGrouping_jit(Xw2: npt.ArrayLike, U: npt.ArrayLike) -> npt.ArrayLike:
+def apply_frequencyGrouping_jit(Xw2: np.ndarray, U: np.ndarray) -> np.ndarray:
     numChannels, _, numFrames = Xw2.shape
     numBarkBands = U.shape[2]
 

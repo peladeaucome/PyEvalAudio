@@ -1,5 +1,4 @@
 import numpy as np
-import numpy.typing as npt
 
 
 class Mixin:
@@ -9,7 +8,7 @@ class Mixin:
             f=self.f_c[:, 0], tau100_s=0.050, tauMin_s=0.008
         ).reshape(1, self.numBarkBands)
 
-        self.patternProcessingAlpha: npt.ArrayLike = np.exp(
+        self.patternProcessingAlpha: np.ndarray = np.exp(
             -1 / (self.Fss_fft * timeConstants)
         )
 
@@ -36,7 +35,7 @@ class Mixin:
         Et = self.idB10(Et_dB)
         return Et
 
-    def frequencySmoothing(self, R: npt.ArrayLike):
+    def frequencySmoothing(self, R: np.ndarray):
         numChannels, numBands, numFrames = R.shape
 
         Ra = np.zeros_like(R)
@@ -54,8 +53,8 @@ class Mixin:
 
     def excitationPatternProcessing(
         self,
-        EsTilde_T: npt.ArrayLike,
-        EsTilde_R: npt.ArrayLike,
+        EsTilde_T: np.ndarray,
+        EsTilde_R: np.ndarray,
     ):
         numChannels, numBands, numFrames = EsTilde_R.shape
 
@@ -102,15 +101,15 @@ class Mixin:
 
     def modulationPatternProcessing(
         self,
-        Es_T: npt.ArrayLike,
-        Es_R: npt.ArrayLike,
-    ) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
+        Es_T: np.ndarray,
+        Es_R: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
         # Average loudness, Eq. (65)
-        Ebar_R: npt.ArrayLike = self.AR_filter(
+        Ebar_R: np.ndarray = self.AR_filter(
             X=np.power(Es_R, 0.3), alpha=self.patternProcessingAlpha
         )
-        Ebar_T: npt.ArrayLike = self.AR_filter(
+        Ebar_T: np.ndarray = self.AR_filter(
             X=np.power(Es_T, 0.3), alpha=self.patternProcessingAlpha
         )
 
@@ -131,16 +130,16 @@ class Mixin:
         )
 
         # MOdulation parameters, Eq. (67)
-        M_T: npt.ArrayLike = Dbar_T / (1 + Ebar_T / 0.3)
-        M_R: npt.ArrayLike = Dbar_R / (1 + Ebar_R / 0.3)
+        M_T: np.ndarray = Dbar_T / (1 + Ebar_T / 0.3)
+        M_R: np.ndarray = Dbar_R / (1 + Ebar_R / 0.3)
 
         return M_T, M_R, Ebar_R
 
     def loudnessCalculation(
         self,
-        EsTilde_T: npt.ArrayLike,
-        EsTilde_R: npt.ArrayLike,
-    ) -> tuple[npt.ArrayLike, npt.ArrayLike]:
+        EsTilde_T: np.ndarray,
+        EsTilde_R: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
 
         c: float = 1.07664
         E0: float = 1e4
@@ -157,6 +156,6 @@ class Mixin:
         N_R *= commonFactor
 
         # Total loudness, Eq. (71)
-        Ntot_T: npt.ArrayLike = np.mean(np.maximum(N_T, 0), axis=1) * 24
-        Ntot_R: npt.ArrayLike = np.mean(np.maximum(N_R, 0), axis=1) * 24
+        Ntot_T: np.ndarray = np.mean(np.maximum(N_T, 0), axis=1) * 24
+        Ntot_R: np.ndarray = np.mean(np.maximum(N_R, 0), axis=1) * 24
         return Ntot_T, Ntot_R

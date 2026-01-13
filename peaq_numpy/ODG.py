@@ -1,5 +1,4 @@
 import numpy as np
-import numpy.typing as npt
 #import numba
 
 
@@ -66,7 +65,7 @@ class Mixin:
         return (x - amin) / (amax - amin)
 
     @staticmethod
-    def sigmoid(x: npt.ArrayLike):
+    def sigmoid(x: np.ndarray):
         # Asymmetric sigmoid, Eq. (150)
         return 1 / (1 + np.exp(-x))
 
@@ -111,8 +110,8 @@ class Linear:
 
     def __init__(
         self,
-        w: npt.ArrayLike = None,
-        b: npt.ArrayLike = None,
+        w: np.ndarray = None,
+        b: np.ndarray = None,
     ):
         self.w = w
         self.b = b

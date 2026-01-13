@@ -57,9 +57,6 @@ Across the given dataset, the RMSE between the expected values and ours is $8.61
 The maximum absolute error on this dataset is of $0.712$.
 The MMS is between 0 and 100.
 
-# Resampling
-We added the resampling method proposed by [[Välimäki and Bilbao, 2023]](https://acris.aalto.fi/ws/portalfiles/portal/106674000/22033.pdf) in the code, in the utils 
-
 # Cite this work:
 
 This work was released with a scientific article.
@@ -76,15 +73,9 @@ If you use it in research, please cite it as:
 This work is a Python implementation of the following:
  - P. Kabal. An Examination and Interpretation of ITU-r BS.1387: Per-
 ceptual Evaluation of Audio Quality. Tech. rep. McGill University,
-2003
+2003.
  - Thorsten Kastner and Jürgen Herre. “An Efficient Model for Estimating
-Subjective Quality of Separated Audio Source Signals”. In: WASPAA
-2019. 2019, pp. 95–99
+Subjective Quality of Separated Audio Source Signals”. In: Proc. of IEEE WASPAA. 2019, pp. 95–99
  - Thorsten Kastner and Jürgen Herre. AudioLabs - Subjective
 Evaluation of Blind Audio Source Separation Database SEBASS-DB.
-https://www.audiolabs-erlangen.de/resources/2019-WASPAA-
-SEBASS/.
-```
-
-
-```
+https://www.audiolabs-erlangen.de/resources/2019-WASPAA-SEBASS/.

@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import numpy.typing as npt
 from typing import Literal
 from . import utils
 from . import time_to_freq
@@ -96,8 +95,8 @@ class PEAQ(
 
     def patternProcessing(
         self,
-        Es_T: npt.ArrayLike,
-        Es_R: npt.ArrayLike,
+        Es_T: np.ndarray,
+        Es_R: np.ndarray,
     ):
         numChannels, numBands, numFrames = Es_R.shape
 

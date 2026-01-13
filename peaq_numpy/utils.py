@@ -1,9 +1,8 @@
 import numpy as np
-import numpy.typing as npt
 
 
 class Mixin:
-    def dB20(self, x:npt.ArrayLike) -> npt.ArrayLike:
+    def dB20(self, x:np.ndarray) -> np.ndarray:
         """
         Converts the input signal to sample-wise decibel scale.
         
@@ -19,7 +18,7 @@ class Mixin:
         """
         return 20*np.log10(np.abs(x))
 
-    def dB10(self, x:npt.ArrayLike) -> npt.ArrayLike:
+    def dB10(self, x:np.ndarray) -> np.ndarray:
         """
         Converts the input signal to sample-wise decibel scale.
         
@@ -35,7 +34,7 @@ class Mixin:
         """
         return 10*np.log10(np.abs(x))
 
-    def idB20(self, x_dB:npt.ArrayLike) -> npt.ArrayLike:
+    def idB20(self, x_dB:np.ndarray) -> np.ndarray:
         """
         Converts from decibel amplitudes to linear
 
@@ -51,7 +50,7 @@ class Mixin:
         """
         return np.power(10, x_dB/20)
 
-    def idB10(self, x_dB:npt.ArrayLike) -> npt.ArrayLike:
+    def idB10(self, x_dB:np.ndarray) -> np.ndarray:
         """
         Converts from decibel amplitudes to squared amplitude
 
