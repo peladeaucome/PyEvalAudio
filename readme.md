@@ -8,10 +8,12 @@ This code will soon be converted into a Python library so that it can be used ea
 This is a port of the PQevalAudio Matlab code to Python.
 
 ## How to use
-Only the numpy version was done. To use, just import peaq_numpy and create a ```peaq_numpy.PEAQ()``` instance.
+To use, import ```peaq_numpy``` and create a ```peaq_numpy.PEAQ()``` instance.
 This object then has ```compute_peaq``` and ```compute_2fmodel``` methods to compute either the PEAQ score (ODG) or the 2fmodel.
 
 An example of use can be found in the ``testparse.py`` script.
+
+**The audio should be sampled at 48 kHz**
 
 ```Python
 from PyEvalAudio import PEAQ
@@ -40,8 +42,10 @@ We find that both are very close to the originals.
 
 ### PEAQ ODG
 
-We tried to copy the PQevalAudio as well as we could.
-We show in the following figure how well we translated the code on the official testing examples
+We tried to reproduce the PQevalAudio code as well as we could.
+We show in the following figure how well we translated the code on the official testing examples.
+The PQevalAudio labels show the results of the 2 implementations (one in Matlab, one in C) of the official implementations of PQevalAudio (Kabal, 2003).
+The PEAQ label shows the expected results on the conformance items written in the PEAQ standard (ITU-R, BS.1387-2, page 71).
 
 ![](Figures/Article/PEAQresultsComparison.svg)
 
@@ -63,10 +67,11 @@ This work was released with a scientific article.
 If you use it in research, please cite it as:
 
 ```LaTeX
-@misc{
-    author={Peladeau, Côme and Fourer, Dominique and Peeters, Geoffroy},
-    title={Estimating distributions in DDSP systems: applications to FM synthesis and audio effects estimation},
-    date={2026},
+@misc{peladeauEstimatingDistributionsDDSP2026,
+  title = {Estimating Distributions in {{DDSP}} Systems: Applications to {{FM}} Synthesis and Audio Effects Estimation},
+  author = {Peladeau, Côme and Fourer, Dominique and Peeters, Geoffroy},
+  date = {2026-01},
+  note = {Submitted to IEEE TASLP}
 }
 ```
 
