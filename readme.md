@@ -1,7 +1,7 @@
 # PyEvalAudio
 
 ## Roadmap
-I need to get this code into a package
+This code will soon be converted into a Python library so that it can be used easily.
 
 ## Porting PQevalAudio to Python
 
