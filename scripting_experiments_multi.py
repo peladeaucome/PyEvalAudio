@@ -2,7 +2,7 @@ import numpy as np
 import musdb
 import os
 import audio_effects
-import peaq_numpy
+import PyEvalAudio
 import utils
 from dataclasses import dataclass
 from joblib import Parallel, delayed
@@ -173,7 +173,7 @@ if __name__=='__main__':
     mus = musdb.DB(root=musdb_path, is_wav=True)
     num_tracks = len(mus)
 
-    peaq = peaq_numpy.PEAQ(Amax=1, verbose=False)
+    peaq = PyEvalAudio.PEAQ(Amax=1, verbose=False)
     RS = utils.resample.Resampler(in_samplerate=44100, out_samplerate=48000)
 
 

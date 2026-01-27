@@ -19,10 +19,6 @@ classifiers = [
 dependencies = [
     "numpy",
     "scipy",
+    "numba",
     "matplotlib"
 ]
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["PyEvalAudio*"]
-exclude = ["tests*"]

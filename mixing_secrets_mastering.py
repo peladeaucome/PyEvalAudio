@@ -3,7 +3,7 @@ import os
 import json
 import scipy.io.wavfile
 import audio_effects
-import peaq_numpy
+import PyEvalAudio
 import utils
 from scripting_experiments_multi import RMS_and_peak_norm
 import matplotlib.pyplot as plt
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     metadata = get_metadata(msm_path=msm_path)
     list_keys = list(metadata.keys())
 
-    peaq = peaq_numpy.PEAQ(verbose=False, Amax=1)
+    peaq = PyEvalAudio.PEAQ(verbose=False, Amax=1)
     rs = utils.resample.Resampler(in_samplerate=44100, out_samplerate=48000)
 
     idx=0

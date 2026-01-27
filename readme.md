@@ -14,7 +14,7 @@ This object then has ```compute_peaq``` and ```compute_2fmodel``` methods to com
 An example of use can be found in the ``testparse.py`` script.
 
 ```Python
-from PQevalAudio import PEAQ
+from PyEvalAudio import PEAQ
 
 peaq = PEAQ(
     mode = "basic", #PEAQ computation mode. Only the basic mode is implemented.

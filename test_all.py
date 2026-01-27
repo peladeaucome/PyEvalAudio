@@ -1,6 +1,6 @@
 import librosa
 import scipy.io
-import peaq_numpy
+import PyEvalAudio
 import os
 import numpy as np
 import results
@@ -58,7 +58,7 @@ def get_refAndCod():
 
 
 if __name__=='__main__':
-    peaq = peaq_numpy.main.PEAQ(mode="basic", output="full", verbose=False)
+    peaq = PyEvalAudio.main.PEAQ(mode="basic", output="full", verbose=False)
 
     ref_names, cod_names = get_refAndCod()
     

@@ -1,6 +1,6 @@
 # import librosa
 import scipy.io
-import peaq_numpy
+import PyEvalAudio
 import os
 import numpy as np
 import results
@@ -20,7 +20,7 @@ def init_parser():
 
 
 if __name__=='__main__':
-    peaq = peaq_numpy.main.PEAQ(mode="basic", output="full", verbose=True)
+    peaq = PyEvalAudio.main.PEAQ(mode="basic", output="full", verbose=True)
 
 
     target_DI = results.get_DI_list()
