@@ -13,4 +13,4 @@ ds_test_2fmodel_pqevalaudio/*
 *.bat
 
 Figures/*
-!Figures/Article/PEAQresultsComparison.svg
+!Figures/PEAQresultsComparison.svg
