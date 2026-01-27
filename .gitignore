@@ -1,5 +1,4 @@
 Matlab/*
-Figures/*
 Center frequencies.txt
 bibliography.bib
 */__pycache__/*git push
@@ -13,3 +12,5 @@ ds_test_2fmodel_pqevalaudio/*
 *.npy
 *.bat
 
+Figures/*
+!Figures/Article/PEAQresultsComparison.svg
