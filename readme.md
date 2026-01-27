@@ -76,8 +76,7 @@ If you use it in research, please cite it as:
 ```
 
 This work is a Python implementation of the following:
- - P. Kabal. An Examination and Interpretation of ITU-r BS.1387: Per-
-ceptual Evaluation of Audio Quality. Tech. rep. McGill University,
+ - P. Kabal. An Examination and Interpretation of ITU-r BS.1387: Perceptual Evaluation of Audio Quality. Tech. rep. McGill University,
 2003.
  - Thorsten Kastner and Jürgen Herre. “An Efficient Model for Estimating
 Subjective Quality of Separated Audio Source Signals”. In: Proc. of IEEE WASPAA. 2019, pp. 95–99
