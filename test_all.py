@@ -1,12 +1,12 @@
 import librosa
 import scipy.io
-import PyEvalAudio
+from Installation import PyEvalAudio
 import os
 import numpy as np
 import results
 import time
 import matplotlib.pyplot as plt
-
+import argparse
 
 
 def get_refAndCod():
@@ -58,6 +58,10 @@ def get_refAndCod():
 
 
 if __name__=='__main__':
+    parser=argparse.ArgumentParser()
+    parser.add_argument('-d', '--data_dir')
+
+    args=parser.parse_args()
     peaq = PyEvalAudio.main.PEAQ(mode="basic", output="full", verbose=False)
 
     ref_names, cod_names = get_refAndCod()
@@ -72,8 +76,8 @@ if __name__=='__main__':
     computed_ODG = np.zeros(num_examples)
 
     for obj_idx in range(num_examples):
-        Fref = os.path.normpath(f"Data/Conformance_Test_Items/{ref_names[obj_idx]}")
-        Ftest = os.path.normpath(f"Data/Conformance_Test_Items/{cod_names[obj_idx]}")
+        Fref = os.path.normpath(f"{args.data_dir}/{ref_names[obj_idx]}")
+        Ftest = os.path.normpath(f"{args.data_dir}/{cod_names[obj_idx]}")
 
         # print(Fref, Ftest)
 
