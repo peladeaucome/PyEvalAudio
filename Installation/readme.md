@@ -38,7 +38,7 @@ If you use it in research, please cite it as:
 ```LaTeX
 @misc{peladeauEstimatingDistributionsDDSP2026,
   title = {Estimating Distributions in {{DDSP}} Systems: Applications to {{FM}} Synthesis and Audio Effects Estimation},
-  author = {Peladeau, Côme and Fourer, Dominique and Peeters, Geoffroy},
+  author = {Peladeau, C\^{o}me and Fourer, Dominique and Peeters, Geoffroy},
   date = {2026-01},
   note = {Submitted to IEEE TASLP}
 }
