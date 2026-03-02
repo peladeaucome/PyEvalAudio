@@ -1,7 +1,11 @@
 # PyEvalAudio
 
-## Roadmap
-This code will soon be converted into a Python library so that it can be used easily.
+## Installation
+
+To install, just use
+```
+pip install git+https://github.com/peladeaucome/PyEvalAudio.git#subdirectory=Installation
+```
 
 ## Porting PQevalAudio to Python
 
