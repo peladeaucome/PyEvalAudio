@@ -41,5 +41,6 @@ setuptools.setup(
         "scipy>=1.11.3",
         "numpy>=1.26.1",
         "numba>=0.58.1",
+        "matplotlib>=3.10.0",
     ],
 )
