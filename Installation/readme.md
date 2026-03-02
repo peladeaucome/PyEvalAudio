@@ -1,8 +1,5 @@
 # PyEvalAudio
 
-## Roadmap
-This code will soon be converted into a Python library so that it can be used easily.
-
 ## Porting PQevalAudio to Python
 
 This is a port of the PQevalAudio Matlab code to Python.
@@ -32,34 +29,6 @@ ODG = peaq.compute_PEAQ(x_T=tested_audio, x_R=reference_audio)
 twof = peaq.compute_2fmodel_from_waveform(x_T=tested_audio, x_R=reference_audio)
 ```
 
-
-## Accuracy
-
-We tested the accuracy of our computation of our implementation by comparing it on the official PEAQ test examples.
-We also compared our 2f model implementation to the one found [here](https://www.audiolabs-erlangen.de/resources/2019-WASPAA-SEBASS/).
-
-We find that both are very close to the originals.
-
-### PEAQ ODG
-
-We tried to reproduce the PQevalAudio code as well as we could.
-We show in the following figure how well we translated the code on the official testing examples.
-The PQevalAudio labels show the results of the 2 implementations (one in Matlab, one in C) of the official implementations of PQevalAudio (Kabal, 2003).
-The PEAQ label shows the expected results on the conformance items written in the PEAQ standard (ITU-R, BS.1387-2, page 71).
-
-![](../Figures/PEAQresultsComparison.svg)
-
-Our implementation matches closely the PQevalAudio implementation.
-On this dataset, the RMSE between the ODG computed using ours and the PQevalAudio Matlab code is $3.46\times10^{-3}$ (the range is between 0 and -4).
-This was tested on the PEAQ conformance audio examples.
-
-### 2f-model
-
-As for the 2f-model, we compare our code with the values given with [its adaptation to the PQevalAudio implementation](https://www.audiolabs-erlangen.de/resources/2019-WASPAA-SEBASS/).
-
-Across the given dataset, the RMSE between the expected values and ours is $8.61\times10^{-2}$.
-The maximum absolute error on this dataset is of $0.712$.
-The MMS is between 0 and 100.
 
 # Cite this work:
 
