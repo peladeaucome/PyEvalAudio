@@ -47,7 +47,7 @@ We show in the following figure how well we translated the code on the official 
 The PQevalAudio labels show the results of the 2 implementations (one in Matlab, one in C) of the official implementations of PQevalAudio (Kabal, 2003).
 The PEAQ label shows the expected results on the conformance items written in the PEAQ standard (ITU-R, BS.1387-2, page 71).
 
-![](Figures/PEAQresultsComparison.svg)
+![](../Figures/PEAQresultsComparison.svg)
 
 Our implementation matches closely the PQevalAudio implementation.
 On this dataset, the RMSE between the ODG computed using ours and the PQevalAudio Matlab code is $3.46\times10^{-3}$ (the range is between 0 and -4).
