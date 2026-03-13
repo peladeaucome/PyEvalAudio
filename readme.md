@@ -1,5 +1,7 @@
 # PyEvalAudio
 
+This repository is an implementation of PEAQ (basic mode only) and 2f-model in Python (using Numpy).
+
 ## Installation
 
 To install, just use
